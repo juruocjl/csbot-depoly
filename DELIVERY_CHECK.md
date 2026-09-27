@@ -88,4 +88,8 @@ uv run --frozen python scripts/check_ai_live.py < /安全路径/test-config.json
 
 上线后仍应按 DEPLOY.md 核对服务及实际 commit、前端构建 commit，并在受控群做人工收发验收。自动化测试通过不表示生产已切换，也不表示历史未归档的机器人消息已被补回。
 
-交付版本（已核对 GitHub 远端）：后端 `4a8f1cdb75523b12033b8ebbaa7185a3d5f62f1b`；前端源码 `bbc325cb213975c0e6278104d32cb3c830269d69`；前端产物 `3f39da006f755d516c03d4263782485a159ae41e`，其提交消息明确对应上述源码。[前端 CI](https://github.com/juruocjl/csbot-front/actions/runs/36302978629) 成功。最终只读核查生产后端仍为 `739decb849b89dc49070be1cb7f954e3d6676dd9`、服务 active；AI 专项生产切换未执行。
+首次交付版本（已核对 GitHub 远端）：后端 `4a8f1cdb75523b12033b8ebbaa7185a3d5f62f1b`；前端源码 `bbc325cb213975c0e6278104d32cb3c830269d69`；前端产物 `3f39da006f755d516c03d4263782485a159ae41e`，其提交消息明确对应上述源码。[前端 CI](https://github.com/juruocjl/csbot-front/actions/runs/36302978629) 成功。
+
+用户随后授权上线，2026-09-27 15:48 CST 已完成以上版本生产切换。受保护生产 API 用独立个人会话完成真实 DSH → Docker Python → 5050 验收，个人历史可取、未知归属记录拒绝；没有向 QQ 群发送测试消息。备份、服务状态、图片数量、内存及后续版本见 [线上发布记录](SERVER_SERVICES.md#2026-09-27-ai-改造上线记录)。
+
+默认人设调整：真实模型使用合成聊天验证吐槽、观点、比赛记录与追问原始值；日常比赛回答保留比分和击杀/死亡数，省略 mid/record_id/秒级时间，明确追问时给 mid 和精确时间。模拟供应商额外确认 DSH 请求实际包含完整的新系统提示。语气为人工检查，模型仍可能追问或展开，不能把一次样例视为每轮都符合主观交流感的保证。
