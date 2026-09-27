@@ -256,3 +256,13 @@ python scripts/check_ai_source.py
 - `POST /api/ai/memory/detail`：参数 scope、id；每次重新验证群/本人归属。返回正文、标签、重要程度、创建/更新时间及归档状态；正文最多131072字符，截断明确标记。
 - 浏览和详情均排除 forgotten，未知/越权 scope 或条目统一404。数据库缺失返回空列表，忙碌/损坏返回503。SQLite以mode=ro/query_only打开，拒绝目录/文件符号链接，不启动Mneme生命周期、迁移或写入；查询超时2秒。
 - 直接适配固定 Mneme 0.8.8 的 memories 字段；不开放上游管理Web端口、磁盘路径、embedding、审计原文或历史正文。升级Mneme时须核对字段兼容性并跑 scripts/check_ai_memory_browser.py。
+
+## 群聊身份记忆与定向纠正（2026-09-27）
+
+一次“波特最爱玩什么”的公开回复区分了被讨论对象和提问者，但Mneme后台蒸馏将称呼、QQ及游戏数据误归给提问者。主循环13次调用均为查询脚本，没有memory_search/save；这不表示后台未提炼。已按用户明确确认纠正具体条目。
+
+- 主循环提示：称呼/外号优先用原生memory_search；明确确认后用memory_save保存带QQ和依据的映射；冲突查证、停用错记；不得将发言者当作被讨论的人。
+- `memory-policy.mjs` 只给原生Mneme的summarization请求加群聊身份/证据规则，保留原插件提炼和写入流程。明确区分发言者/对象、禁止从疑问句或“就是某某吧”猜身份、禁止混淆榜单成员、避免把临时统计和推测变为长期偏好。旁听上下文仍不送入蒸馏；未修改上游依赖源码。
+- 这些是模型行为约束，不能保证任何未来提炼都正确；使用记忆浏览页核对异常。自动提炼发生在回合结束后，不等同于主循环显式memory_save工具调用。
+- `scripts/ai_repair_memory.py` 接收明确group、旧条目ID及id/type/title/content的SHA256、新确认条目；默认dry-run。apply获取与后端相同的状态锁，要求停服及新私有备份目录，备份运维SQLite和目标scope完整内容，再通过原生memory_save/forget纠正并memory_search验证。不直接UPDATE Mneme内容；旧错误条目仅forgotten，可恢复。
+- 新确认使用唯一标题，拒绝标题冲突或复活被遗忘条目；旧内容哈希或群归属不匹配即拒绝。重复运行已成功计划返回already_applied；无模型调用、无群消息、无主数据库写入。
