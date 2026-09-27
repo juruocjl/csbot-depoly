@@ -93,3 +93,30 @@ uv run --frozen python scripts/check_ai_live.py < /安全路径/test-config.json
 用户随后授权上线，2026-09-27 15:48 CST 已完成以上版本生产切换。受保护生产 API 用独立个人会话完成真实 DSH → Docker Python → 5050 验收，个人历史可取、未知归属记录拒绝；没有向 QQ 群发送测试消息。备份、服务状态、图片数量、内存及后续版本见 [线上发布记录](SERVER_SERVICES.md#2026-09-27-ai-改造上线记录)。
 
 默认人设调整：真实模型使用合成聊天验证吐槽、观点、比赛记录与追问原始值；日常比赛回答保留比分和击杀/死亡数，省略 mid/record_id/秒级时间，明确追问时给 mid 和精确时间。模拟供应商额外确认 DSH 请求实际包含完整的新系统提示。语气为人工检查，模型仍可能追问或展开，不能把一次样例视为每轮都符合主观交流感的保证。
+
+### 实时过程和图片输出验收
+
+新增可重复检查：
+
+```bash
+# 本机模拟慢模型，运行真正的 DSH，无真实密钥：
+uv run --frozen python scripts/check_ai_realtime.py
+# 实际 QQ 回复函数 + 合成图片，模拟生成，不发送 QQ：
+uv run --frozen python scripts/check_ai_image_reply.py
+# Linux/Docker 原有检查已增加中文 matplotlib 与 send=True 提交：
+uv run --frozen python scripts/check_ai_sandbox.py
+```
+
+2026-09-27 本轮本地验收：web/QQ 两条路径均在回复完成前收到 reasoning 和工具开始事件；慢工具期间 steer 及时确认；原问题、补充答案保留；全局执行槽串行；结束后拒绝插入。实际原生事件经过前端投影后，工具调用与结果能正确合并。现有 DSH/Mneme 七项协议回归与图片/权限四项边界检查通过。
+
+使用 csbot_backup 及现有令牌，本地受保护 API 已验证：同群其他成员可看群过程/图片，跨群及他人个人会话不可看；游标续读不重复，失效游标 409；断开 SSE 不取消任务；原图缺失 410、授权缩略图仍可读、未认证拒绝。实际 QQ 回复函数可组装生成图片；模拟 OneBot 验证发送后图片可检索、回流去重及故障只重试索引。未向真实 QQ 群发验收消息。
+
+前端 `npm run build` 通过（原有大 bundle 提示仍存在）。本次 AI 页面及引用文件使用临时兼容 vue-tsc/TypeScript 检查通过；仓库原有 vue-tsc 1.x 与当前 TypeScript 不兼容，全仓检查另外发现既有 MatchGPHistory.vue:388、MatchHistory.vue:404 语法错误，不将全仓类型检查记为通过。本次不修改这些无关页面。
+
+真实模型专项脚本 `scripts/check_ai_live_stream.py` 从 stdin 接收仅 CS_AI_MODEL/CS_AI_URL/CS_AI_API_KEY 的 JSON，使用候选镜像 `csbot-ai-python:realtime-candidate` 和临时 DSH 会话；仅合成数据，无数据库访问能力。验证供应商真实 reasoning 在完成前可见、脚本期间原生 steer 成功、中文图显式提交、两个问题均回答。凭据由忽略目录的安全配置经 SSH stdin 提供，不写命令参数或日志。
+
+服务器真实验收结果：候选隔离镜像通过中文字体绘图、图片显式提交、只读根/无网络/无 Docker socket/cgroup 限额及输出超限清理。真实模型专项脚本通过思考流、工具期间补充、原问题与补充共同回答、PNG 提交。
+
+生产经 Nginx 的受保护验收：首个模型事件约 **0.92 秒**，原问题与排队问题共约 **14.89 秒**；观察到真实 reasoning、工具开始时及时插入补充、普通第二请求为 queued、最终两轮 completed。生成 PNG **25,284 字节**可鉴权读取，个人历史携带图片索引，事件游标续读无重复。只使用独立个人会话和合成数据，没有向 QQ 群发送测试消息。该耗时为一次验收样本，不是延迟保证。
+
+QQ 入口补充回归：插入成功仅链接原任务，不发不存在的新记录链接；错过当前轮先登记新任务再通知；模型启动前故障将记录标为 interrupted。`/ai`、角色命令、@/回复触发共用同一逻辑，实际发送依然由 OneBot 包装器归档。
