@@ -58,6 +58,26 @@ systemctl is-active mihomo docker csbot
 
 服务器存在未跟踪的数据和辅助脚本，不能为“清理工作区”删除它们。发布前备份本次可能变更的配置和数据；数据库结构变更还须有单独的迁移与恢复方案。 后端 AI preflight 要求至少 800 MiB 可用磁盘；发布前必须把本次备份增量计入，确认**备份完成后**仍满足门槛。空间紧张时先准备压缩备份并逐文件校验其可恢复性，不要等停服后才触发磁盘门槛，也不要降低门槛或擅自删除历史数据。
 
+## 磁盘与日志维护
+
+系统 journal 使用后端仓库模板 `deploy/systemd/journald.conf.d/60-csbot-retention.conf`，持久日志上限 512 MiB、单文件 64 MiB、最长保留 14 天，并尽量为文件系统留出 2 GiB。容量限制先到时，实际保留时间会短于 14 天；活跃日志和轮转时会有少量额外占用。这些设置不会删除其他目录以保证空闲空间。
+
+模板按上述 Git 发布流程同步到服务器后安装，只重启日志服务，无需重启业务：
+
+```bash
+sudo install -d -m 0755 /etc/systemd/journald.conf.d
+sudo install -m 0644 /home/ubuntu/csbot/deploy/systemd/journald.conf.d/60-csbot-retention.conf /etc/systemd/journald.conf.d/60-csbot-retention.conf
+sudo systemctl restart systemd-journald
+sudo journalctl --rotate
+sudo journalctl --vacuum-size=512M --vacuum-time=14d
+sudo journalctl --disk-usage
+df -h /
+```
+
+清理 Docker 时先核对运行容器和镜像标签。无标签旧镜像可用 `docker image prune`，旧构建缓存可用 `docker builder prune --filter until=24h`；不执行包含卷的整体清理，也不把尚未运行容器的 `csbot-ai-python:1` 隔离镜像当作废弃镜像。有标签回滚镜像、数据库、QQ 会话、小图及历史备份须分别确定用途和保留范围。安装缓存若被运行中的进程占用，跳过清理，不强行抢锁。
+
+硬链接图片备份可能继续持有被 LRU 淘汰的磁盘块。多次 `du` 会因遍历顺序把共享块算在不同目录，不能将各次结果直接相加；评估回收量应按 inode 去重并核实链接数。不要把图片备份存在解释为 LRU 未执行。
+
 ## 后端发布
 
 涉及 DSH/Mneme AI 改造时，先完成 [AI 专项发布前置步骤](AI_RUNTIME.md#发布前准备)，包括 Node、npm 固定依赖、隔离镜像、服务身份权限与前置检查。仅 pull 并重启不足以完成该版本部署。
