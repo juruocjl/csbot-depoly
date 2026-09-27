@@ -137,3 +137,10 @@ QQ 入口补充回归：插入成功仅链接原任务，不发不存在的新�
 - 只读连接`csbot_backup`验证3个新SQL模板（缓存成员40条、竞选键3条、指定用户点数流水50条）；点数聚合与物理表精确群过滤计数一致，未知群无法读到点数与管理员状态。没有在生产业务库运行该测试，也没有写入测试数据。
 - 线上使用已有认证令牌和新的独立个人会话，真实模型→隔离Python查询成员、QQ管理员/竞选记录、规则和点数；头像下载后原生`read_image`实际返回image内容。最终版本只需1次execute_python+1次read_image，均成功；未向QQ群发验收消息。
 - 首次线上测试发现QQ返回JPEG而缓存扩展名PNG导致DSH拒读，模型靠缩略图恢复。已修复为下载后规范化最长640像素PNG，并用真实模型复验直接读取成功；不能把首次调用动作当作读取成功。
+
+### 业务源码映射验收（2026-09-27）
+
+- `scripts/check_ai_source.py` 通过：13文件逐字快照、函数索引、只读文件权限、退出清理；哈希变化、符号链接、manifest追加环境文件均拒绝。`check_ai_boundaries.py` 4项通过。
+- `check_dsh_runtime.py` 当前8项通过，新增真实原生read先读SOURCE.md，再读授权快照中的calc_roll_point/roll_admin源码；宿主文件拒绝、工具数量、群/个人/Mneme及压缩恢复回归保持通过。
+- 服务器独立验收目录使用ubuntu用户与docker组运行`check_ai_sandbox.py`通过：/source可搜索函数，修改现有源码与新建文件均失败，无.env.prod/.git/data；原有无网络、无密钥/宿主Docker socket、cgroup限制、中文绘图、产物导出和输出超限清理检查通过。没有重建镜像。
+- 最终线上个人会话使用真实模型与原生read/隔离Python完成验收：VERSION.json与部署commit一致且matches_head=true，实际读取setcard_function，并验证只读挂载拒写。模型根据finish之后的控制流指出“设置昵称实际不会加20点”，没有仅复述帮助。测试未查询业务数据库、未向QQ发送消息。

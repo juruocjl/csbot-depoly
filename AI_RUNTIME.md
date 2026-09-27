@@ -37,7 +37,7 @@ mid、record_id、block_id 等仍保留在内部资料中用于准确查询、�
 
 ## 查询和脚本边界
 
-模型只看到 `read`、`read_image`、`execute_python` 和 Mneme 的保存/检索/忘记工具。文件访问只允许本会话工作目录和服务端确认属于当前群的图片路径，按 realpath 校验；不开放宿主 shell、写文件工具、子进程工具或任意插件安装。
+模型只看到 `read`、`read_image`、`execute_python` 和 Mneme 的保存/检索/忘记工具。文件访问只允许本会话工作目录、服务端确认属于当前群的图片路径，以及本轮已审查业务源码快照中的明确文件，按 realpath 校验；不开放宿主 shell、写文件工具、子进程工具或任意插件安装。
 
 脚本通过 `csdata.call()` 调用预写 SQL，也可以 `csdata.query()` 自写查询；两者走同一个授权编译器。`catalog()` 和工作目录的 DATA.md 给出表、字段、参数、查询样例及统计语义。`search/block/image/status` 也是脚本 SDK 的方法，不额外扩展模型工具列表。
 
@@ -47,7 +47,7 @@ mid、record_id、block_id 等仍保留在内部资料中用于准确查询、�
 | 游戏库 | SQLite mode=ro、query_only、authorizer，只开放状态历史和名称表；先由主库取得本群 SteamID 再施加过滤。 |
 | SQL | 单条 SELECT；禁写入、系统表、物理 schema、递归 CTE、不在白名单的函数/类型。可用聚合、JOIN、窗口、非递归 CTE。 |
 | 返回 | 500 行、256 KiB；明确 truncated；数据库超时 8 秒，全局并发 2。必须聚合或分页，不能拿截断结果假装总体统计。 |
-| Docker | 无网络、只读根、非 root、cap-drop ALL、no-new-privileges；192 MiB、0.5 CPU、32 PID、45 秒。只挂当轮 Unix 查询 socket 和可信中文字体文件，不挂数据库、仓库目录、Docker socket或模型密钥。 |
+| Docker | 无网络、只读根、非 root、cap-drop ALL、no-new-privileges；192 MiB、0.5 CPU、32 PID、45 秒。只挂当轮 Unix 查询 socket、可信中文字体文件及可选的已审查源码快照（/source只读），不挂数据库、完整仓库、Docker socket或模型密钥。 |
 | 脚本 | 64 KiB 输入、最多 32 次数据调用、4 MiB 输出；工作目录 32 MiB、临时目录 16 MiB。numpy/matplotlib/Pillow 固定版本。不可用时明确失败，不降级为宿主执行。 |
 | 结果文件 | 仅少量 PNG/JPEG/TXT/CSV/JSON，单个 2 MiB，路径由宿主随机化；供本轮只读复核，下轮清理临时文件。 |
 
@@ -214,3 +214,25 @@ apply 获取与后端相同的独占状态锁，后端运行时拒绝操作；�
 - 当前管理员、昵称和点数须重新查询，不灌入长期记忆冒充恒定事实。网页版仍只能查询认证群资料，个人记忆不写群会话。新功能没有任免、禁言、改名或加点权限。
 
 不需要新增数据库结构、依赖或重建沙箱镜像；按常规后端Git发布。回归：`python scripts/check_group_knowledge.py` 与 `python scripts/check_ai_boundaries.py`。真实数据库测试仍仅用csbot_backup；线上通过既有认证API验收，不发QQ测试消息。
+
+## 业务源码只读映射
+
+模型可用现有`read`读取本轮工作目录的`SOURCE.md`，按其中模块用途与函数行号索引阅读实现；隔离Python的`/source`挂载同一快照，可用Path/ast搜索和分析。不增加模型工具，不自动注入整份源码，不执行或import机器人插件。
+
+- 首批13个明确白名单文件共202,324字节：复读/竞选、复读配置字段默认值、消息归档、战绩统计、业务模型、时间/昵称辅助、CS命令、日报周报、小功能帮助、时间命令/时区逻辑、AI群查询/SQL编译。完整白名单在`ai_runtime/source.py`，不递归发布整个plugins或仓库。
+- `source-manifest.json`记录逐文件审查SHA256。运行与部署preflight同时检查文件集合、哈希、普通文件、路径/符号链接和大小；变动未经复核时拒绝开放并使发布前检查失败。初始检查未发现所选文件包含凭据字面值；后续更新不能用自动扫描代替内容审查。
+- 每轮从核验后的字节生成临时快照，保持原始行号；自动AST函数/类索引不import源码。快照含Git commit、所选代码是否与HEAD一致和集合哈希；有工作区改动或Git信息缺失时不伪称该commit的原样代码。生产发布仍要求已跟踪文件干净。
+- 原生read仅被授权快照内明确文件，不开放原仓库目录。Docker只读挂载快照到`/source`，包含的文件本身0444；原有网络、凭据、PID/CPU/内存和工具预算不变。正常完成/异常退出后清理本轮临时快照，旧路径不能跨轮复用；强制杀进程遗留临时文件由宿主临时目录维护策略处理。
+- 没有环境文件、Git历史、数据库行、其他群会话或运行日志。源码模型里的物理表/字段不扩大SQL权限；读取代码不意味着获得任免、修改、网络请求权限。未映射依赖必须说明缺口。帮助/注释可能滞后，应读实际控制流；当前配置和群状态继续实时查询。
+
+### 后续源码变更的维护
+
+凡修改白名单中的业务源码，须先人工核对变更中没有凭据、私有数据或需要排除的新内容，再在本地执行：
+
+```bash
+python scripts/ai_source_manifest.py --accept-reviewed
+python scripts/ai_source_manifest.py
+python scripts/check_ai_source.py
+```
+
+`--accept-reviewed`只是确认审查后的哈希更新，不是自动安全审查。新增白名单文件也须先审查；不要将该命令放入服务器启动流程自动接受变化。源码和manifest一同commit/push、服务器ff-only更新；否则preflight会阻止新版本启动。需要时通过正常revert流程回退源码和manifest，不能为放行而跳过校验。此功能不需要重建隔离镜像或前端，也不改变数据库结构。
