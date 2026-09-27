@@ -144,3 +144,9 @@ QQ 入口补充回归：插入成功仅链接原任务，不发不存在的新�
 - `check_dsh_runtime.py` 当前8项通过，新增真实原生read先读SOURCE.md，再读授权快照中的calc_roll_point/roll_admin源码；宿主文件拒绝、工具数量、群/个人/Mneme及压缩恢复回归保持通过。
 - 服务器独立验收目录使用ubuntu用户与docker组运行`check_ai_sandbox.py`通过：/source可搜索函数，修改现有源码与新建文件均失败，无.env.prod/.git/data；原有无网络、无密钥/宿主Docker socket、cgroup限制、中文绘图、产物导出和输出超限清理检查通过。没有重建镜像。
 - 最终线上个人会话使用真实模型与原生read/隔离Python完成验收：VERSION.json与部署commit一致且matches_head=true，实际读取setcard_function，并验证只读挂载拒写。模型根据finish之后的控制流指出“设置昵称实际不会加20点”，没有仅复述帮助。测试未查询业务数据库、未向QQ发送消息。
+
+### AI只读列表页验收（2026-09-27）
+
+- 后端`check_ai_conversations.py`本地及Linux通过：本群QQ/report与本人个人记录可见、跨群/他人个人/未知类型排除；预览300字符封顶、30条分页、翻页无重叠、新记录不干扰已有游标、非法游标拒绝。生产使用已有令牌只读验证接口200、分页无重叠、未认证401/403、非法游标400，未创建问题或调用模型。
+- 前端Vite build通过；使用既有临时兼容vue-tsc检查AIChat.vue及依赖通过（未宣称修复历史全仓类型检查问题）。对应GitHub Actions运行`36312797928`成功，构建产物提交对应源码`0bfcc3f64b78cfd04f8e3b618a5637f74662dac6`。
+- 真实Chrome已登录页面验收：入口“对话列表”，textbox和“新对话”按钮均0；加载更多由30项增至40项；点击既有个人记录读取最终回答“排队验收完成。”，返回列表正常。原chatId详情仍用既有实时过程链路，无新增提问动作。
