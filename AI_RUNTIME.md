@@ -266,3 +266,39 @@ python scripts/check_ai_source.py
 - 这些是模型行为约束，不能保证任何未来提炼都正确；使用记忆浏览页核对异常。自动提炼发生在回合结束后，不等同于主循环显式memory_save工具调用。
 - `scripts/ai_repair_memory.py` 接收明确group、旧条目ID及id/type/title/content的SHA256、新确认条目；默认dry-run。apply获取与后端相同的状态锁，要求停服及新私有备份目录，备份运维SQLite和目标scope完整内容，再通过原生memory_save/forget纠正并memory_search验证。不直接UPDATE Mneme内容；旧错误条目仅forgotten，可恢复。
 - 新确认使用唯一标题，拒绝标题冲突或复活被遗忘条目；旧内容哈希或群归属不匹配即拒绝。重复运行已成功计划返回already_applied；无模型调用、无群消息、无主数据库写入。
+
+## 分层记忆（2026-09-27）
+
+### 存储与分类
+
+Mneme仍是唯一事实存储。宿主不另建人物库或摘要库，也不改node_modules。`layered-memory.mjs`通过插件注册回调包装原生save/search/forget，后台提炼也走相同保存入口。正文保存`csbot-memory-v1` JSON（tier/category/subject/keys/text/evidence/supersedes/recorded_at），原生tags保存tier/category供查询；原生type只作兼容载体，产品分类不再依赖project。
+
+- foundation：精简基础知识，四类alias人物称呼、glossary群内词典、style交流习惯、agreement长期约定。人物主体为QQ；黑话/习惯/约定需明确适用对象。基础正文最多700字符。
+- topic：长期偏好、持续话题与专题背景。
+- episode：查询结果、临时统计、经历及明确标注的不确定线索。记录时间，回答当前管理员/点数/时长仍查询业务库。
+- 旧ai_mem手工确认：依据`legacy-ai-mem-explicit`来源识别，保留为基础层的“旧版手工确认”原文，不需要经过新模型重新批准。原文较短直接加载，较长保留标题指针、按需查询全文；来源与确认级别不因分类改变。
+- legacy：其余无新格式的自动条目保持原文、可检索，浏览标记“旧资料·待整理”。不按旧type或importance推断可信度，不批量删除或重写。
+
+基础层引用本会话被叫到后的原始用户消息或完整公开工具返回，保存来源ID和逐字引文；插件注入的旁听内容、推理、memory工具返回不作为晋升证据，避免旧记忆自证。证据目录有数量/长度限制，超长工具结果不作为完整证据。别名依据须包含主体QQ与称呼。再用独立语义检查核对主体、稳定性和纠正关系；这是降低模型错误的措施，不保证语义零错误。普通用户信息是群内声明，不等同于管理员认证。
+
+显式保存不满足基础准入则返回错误，模型可澄清或选择低层。后台候选不满足准入则作为标明“未确认”的episode保存；模型/存储故障不伪装成确认失败，不消费原生提炼游标。下次调用可重试窗口，证据目录只接纳本次调用的有界证据，防止已遗忘的旧事实从历史证据目录自动复活；重试旧窗口若缺少新确认，只能留作未确认资料。
+
+### 更新与召回
+
+同一事实用内容哈希标题避免Mneme同标题追加导致JSON损坏；网页去掉内部哈希。纠正通过supersedes列旧ID，要求同基础分类、检索键有交集、原文明确纠正；先保存回读成功，再原生forget旧条目。新记录中的supersedes使中途失败后优先召回也能排除旧记录。明确同名但不同主体可以并存并标注冲突，不能默默选一人。
+
+关闭Mneme默认autoInject，启用DSH sdk-minimal默认关闭的`system-prompt.includeRuntimeContext`；通过原生`system-prompt/assemble`加入可持久化的上下文快照，保持模型请求由会话日志重建。主agent循环不替换为另外的循环。
+
+- 交流习惯1200字符、长期约定800字符、当前问题命中的人物/词典2000字符；旧版手工确认原文另有4000字符预算，各自独立，避免其他条目挤掉身份或旧手工知识。不是全文注入所有人物。
+- 使用原生keyword查询tier:foundation，并按确定的导入标题和source筛选旧手工确认条目，单进程缓存最多2000条新基础记录，保存/忘记使缓存失效；低层资料不进入这份缓存。达到该基础词典规模需扩展索引策略；超出预算的条目仍能用memory_search查找。
+- memory_search优先返回基础、专题、资料、旧资料，明确返回tier/category/evidence，默认20条、最多100条。低层内容保持按需检索。
+- 自动提炼仍由Mneme生命周期与游标驱动，宿主核对并用原生工具保存，完成后返回空摘要避免上游重复写入。原生摘要审计写入数量不代表宿主已保存数量，以CSBot的memory_status事件和记忆页为准。
+- 详细过程显示整理完成/未新增/失败；不会补造主模型memory_save调用。
+
+### 浏览与运维
+
+`/ai-memory`增加层级筛选及基础四分类；详情显示对象与确认依据。API list增加tier/category，权限仍每次从登录身份推导，不接受任意磁盘路径。个人会话、群会话物理隔离维持不变。普通模型上下文只包含精简证据索引，完整证据仅在整理/核验时提供，避免把历史工具全文每轮重复注入。
+
+部署无业务数据库迁移、不重建隔离镜像。旧资料不需要数据迁移；已由用户核实的特定条目可用现有ai_repair_memory.py按哈希计划备份后保存新格式并忘记旧副本。回退先恢复相应scope备份，避免旧autoInject把新格式当普通project大范围注入。
+
+验收入口：`node scripts/check_layered_memory.mjs`、`python scripts/check_dsh_runtime.py`、`python scripts/check_ai_memory_browser.py`。此外用合成对话与真实模型核对自动提升、重启召回、疑问不提升、明确纠正停用旧结论，不向QQ群发送验收消息。

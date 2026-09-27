@@ -130,6 +130,7 @@ sudo -n journalctl -u csbot-memory-guard.service -n 30 --no-pager
 ```bash
 set -e
 cd /home/ubuntu/csbot/dist
+umask 022  # 私有备份的077不能沿用到公开静态文件/目录
 git fetch origin build-output
 git pull --ff-only origin build-output
 git rev-parse HEAD
