@@ -33,7 +33,7 @@ Mneme 从被叫到后的公开对话提炼，不把插件注入的旁听原文�
 
 mid、record_id、block_id 等仍保留在内部资料中用于准确查询、关联与追溯，日常回复用昵称、地图、比分、原话片段指代。时间按服务端当前时间及 Asia/Shanghai 转成“昨晚”、月日/时段等必要精度；不照搬秒、毫秒和原始时间戳。明确索要原始编号/精确时间或排障、区分记录需要时仍能提供。数值统计和内部计算保留真实精度。通过模型提示及 DATA.md 约束表达，不对最终文本粗暴删除数字，因此不承诺每次生成都绝无偏差，应继续按实际对话样例调整。
 
-旧 `ai_mem` 的手工记忆在该群首次调用时导入 Mneme，排除 `[自动日报周报知识]` 后的自动报告区域；保留原表，不导入旧 QA 全文。固定标题去重，迁移标记只在成功后写入；超过 64,000 字符则明确要求管理员分批处理。
+旧 `ai_mem` 现作为只读历史归档保留。自动首次调用迁移已退役，改用下文离线迁移/核对脚本，经备份、正文比对和 Mneme 原生检索后保存回执。仅处理有明确群号的手工记忆，排除旧问答/日报摘要，不把个人会话并入群。
 
 ## 查询和脚本边界
 
@@ -94,7 +94,7 @@ PIP_INDEX_URL 可省略，默认官方源；验收机官方包下载很慢，清
 
 | 配置 | 值/含义 |
 | --- | --- |
-| CS_AI_ENGINE | dsh（默认）；legacy 为临时回退，不支持隔离网页会话。 |
+| CS_AI_ENGINE | 仅 dsh；旧引擎及旧记忆读写已移除，legacy 不再可用。 |
 | CS_AI_URL / CS_AI_API_KEY | 沿用既有模型接口；从安全配置读取，禁止写入 Git/文档。 |
 | cs_ai_model | 仍从数据库动态配置读取，不用旧环境值覆盖已保存选择。 |
 | CS_AI_VISION | 默认 true；模型不支持图片时显式 false，不能假装看到了图片。 |
@@ -133,7 +133,7 @@ uv run --frozen python scripts/ai_import_ownership.py --state data/ai/state.sqli
 
 备份时停止后端后复制整个 `data/ai`（含 DSH sessions、Mneme SQLite/WAL、state.sqlite3）和图片目录；不要只复制打开状态的 SQLite 主文件。PostgreSQL 继续用现有备份流程。旧记录访问权依赖 state.sqlite3，丢失它应拒绝访问，不能自动放宽。
 
-回退前记录后端/前端源码和 build-output commit，保留新数据。移除 AI 专项 drop-in 后可以回滚已知可用后端 commit；若只设 CS_AI_ENGINE=legacy，网页 AI 会明确拒绝，避免恢复为不隔离会话。图片已按获准预算淘汰的大图无法通过代码回滚恢复，只有备份能还原；小图不删除。旧 ai_mem 与 PostgreSQL 问答没有被迁移程序删除。
+回退前记录后端/前端源码和 build-output commit，保留新数据。移除 AI 专项 drop-in 后可以回滚已知可用后端 commit；不能用 CS_AI_ENGINE=legacy 回退；旧引擎已移除，必须走已审查的代码 revert 发布。图片已按获准预算淘汰的大图无法通过代码回滚恢复，只有备份能还原；小图不删除。旧 ai_mem 与 PostgreSQL 问答没有被迁移程序删除。
 
 ## 实时过程、请求排队与生成图片（2026-09-27）
 
@@ -179,3 +179,26 @@ csdata.artifact("chart.png", send=True, caption="趋势图")
 本次仅自动增加 AI 运维 SQLite 的 `run_events`、`run_images` 表及媒体索引 `private` 列，不生成或执行 PostgreSQL 业务迁移。发布前用 SQLite backup API 保存两个索引；保留既有 DSH/Mneme 状态。必须重新构建 `ai_runtime/sandbox.Dockerfile`，才能让容器中的 csdata SDK 支持 `send=True` 与中文字体配置。
 
 按 DEPLOY.md 先推送代码，经服务器独立验收目录验证，再更新生产、重启后端、加载 Nginx 配置。验证 Nginx 实际配置含 `proxy_buffering off`；若单文件 bind mount 仍指向旧 inode，重建 Nginx 容器加载新文件。旧 observer 单元只在确认 disabled/inactive 后移入本次私有备份，不删除历史快照数据。回退用代码 revert 正常发布并恢复旧镜像标签；新增 SQLite 数据可保留，旧代码不使用这些表。
+
+
+## 旧记忆接口退役与离线迁移
+
+- 删除 `/ai记忆` 专用命令及帮助条目。现在直接在 `/ai` 或 @/回复机器人的正常对话中说“记住…”或“忘记…”，由 Mneme 工具处理。
+- 删除旧 DataManager 的手工记忆、问答摘要和日报摘要读写接口；定时日报/周报照常生成、发送、归档，但不再向旧表写记忆。移除依赖这些接口的旧 AI 引擎回退实现，DSH 为唯一执行入口。
+- 群请求不再查询 ai_mem 或触发隐式迁移。AIMemory ORM 定义和原 PostgreSQL 表保留，用于备份、核对及明确的离线迁移；没有删表或删旧内容。
+
+`scripts/ai_import_legacy_memory.py` 从 stdin 接收 `[{"gid":"群号","mem":"原文"}]`。默认 dry-run，输出大小、源 SHA256、目标 scope 和 pending/already_present/conflict 状态，不输出正文。只接受数字群号，`:qa`/`:report` 明确排除，未知键直接拒绝；手工记忆中 `[自动日报周报知识]` 之后内容也排除。
+
+```bash
+# 在后端仓库、已激活 .venv 且 Node 22 PATH 就绪时执行；source.json 是服务器私有导出。
+python scripts/ai_import_legacy_memory.py --state-dir data/ai < /私有目录/source.json
+# 完成代码发布并停后端及内存守护后执行。backup-dir 必须是不存在且位于 state-dir 外的新目录：
+python scripts/ai_import_legacy_memory.py --state-dir data/ai --apply \
+  --backup-dir /home/ubuntu/backups/legacy-memory-本次日期 < /私有目录/source.json
+```
+
+apply 获取与后端相同的独占状态锁，后端运行时拒绝操作；先创建 0700 备份目录，保存源数据（0600）、SQLite backup API 一致性副本和相关群完整 DSH/Mneme 目录，再操作。用固定版本 DSH 的 `memory_save`/`memory_search` 执行导入和检索；不向模型发送数据、不产生用户聊天轮次、不运行脚本容器、不提炼记忆。原文逐字保留，每段最多 4000 字符，上限 64000 字符，超限须另行审查拆分。
+
+已有对应条目时只核对原文和原生检索，不重复写入。发现已迁移内容被修改、遗忘、归档或记录冲突时拒绝覆盖/复活；不得为了通过验收把群友已经删除的记忆重新灌回。校验后在运维 SQLite 的 `memory_import_receipts` 保存源哈希及时间，在备份目录保存 receipt.json。重新执行必须使用新的备份目录，但不增加相同记忆。
+
+回退先停服务与内存守护，用本次备份恢复运维 SQLite 和对应 scope；其余个人或群 scope 不动，PostgreSQL 原表始终保留。不要在线复制正在写入的 SQLite 文件回滚。旧接口的代码回退仍按 Git revert→push→pull→重启流程执行。
