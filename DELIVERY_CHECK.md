@@ -157,3 +157,11 @@ QQ 入口补充回归：插入成功仅链接原任务，不发不存在的新�
 - `node --test csbot-front/checks/aiTrace.test.mjs` 四项通过：多轮实时/回放一致、同尝试跨工具分段与并行结果、完整块与重试、补充/历史孤立结果。AI 页面相关 vue-tsc 检查及生产构建通过（保留既有 bundle 大小提示）。
 - 使用现有令牌只读取得一条已完成、有权限的真实事件记录（2286 个事件），回放得到 reasoning/tool/reasoning/tool/reasoning/tool/reasoning/text；线上 Chrome DOM 验证顺序一致，三个工具结果及生成图片保留。未调用模型或发送 QQ 测试消息。
 - GitHub Actions `36314402109` success，前端源码 `6b25ed3bc43e05bb22966698443b18477fe02086`，产物 `cb1e193c01c86fac8e2aab6230ab0d0babb82f86`；仅静态前端发布，后端无需重启。
+
+## 2026-09-27 记忆浏览验收
+
+- 新增 `scripts/check_ai_memory_browser.py`：四项合成库测试覆盖群/个人范围授权、字面搜索与游标分页、归档/遗忘过滤、数据库内容不变、缺失库不创建、符号链接拒绝、正文长度与截断标记。本机Python3.12及独立Linux验收目录均通过。
+- 前端AI页面相关类型检查、生产构建通过（只有既有bundle大小提示）。新增 `/ai-memory`，侧栏/对话页提供入口，无新增、修改、删除控件。
+- 线上使用已有测试令牌，只读验证scope/list/detail/search/archive及分页；群有效记忆190条、本人个人scope7个；未登录401/403，未知scope列表/详情404，坏游标400。未调用模型、未发QQ消息、未新增测试令牌。
+- Chrome实际操作验证：群列表20→40条分页、详情正文加载、关键词“旧群记忆迁移”命中1条、切换本人个人会话并清空搜索后显示6条；与API隔离结果一致。
+- 前端源码 `e860decf1606537904982cd12aa72a730227b77a`，GitHub Actions `36315452646` success，产物 `628b6fe6b7f34b31232b4cc6b41ce529e89973a7`；后端 `abe04873edaf6a5203176ac3817a9e48f6b223c2`。
