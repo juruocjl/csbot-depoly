@@ -146,6 +146,16 @@ Steam Monitor 应显示 `healthy`，其 `/api/health` 应包含 `loggedOn=true` 
 
 迁移后先恢复数据和环境文件，再安装 systemd 文件、启动 mihomo、启动 Docker Compose 项目，最后启动 `csbot.service`。
 
+## 后端内存保护配置
+
+配置入口见 [部署手册：后端内存保护](DEPLOY.md#后端内存保护)。部署后应保留：
+
+- `/usr/local/lib/csbot-memory-guard.py`
+- `/etc/systemd/system/csbot-memory-guard.service` 与 `.timer`
+- `/etc/systemd/system/csbot.service.d/memory.conf`
+
+模板仍在后端仓库 `scripts/` 与 `deploy/systemd/`。守护任务的 `/run/csbot-memory-guard/guard.lock` 仅为运行时锁，无需备份。日志通过 `journalctl -u csbot-memory-guard.service` 查看；是否安装及启用以实时 `systemctl` 查询为准，不由模板存在推断。
+
 ## 索引维护
 
 历史聊天索引重建会降低进程优先级，并批量写入。生产环境必须使用 transient systemd service 限制资源，仍应在业务低峰执行：

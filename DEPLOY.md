@@ -76,6 +76,49 @@ sudo -n systemctl --no-pager -l status csbot.service
 
 Git 拉取失败先检查 Mihomo。旧脚本有一次禁用 Git HTTP 代理的重试；手工操作也可在确认直连可用后使用 `git -c http.proxy= -c https.proxy= pull --ff-only origin main`，不要修改全局代理作为临时排障手段。
 
+## 后端内存保护
+
+适用当前约 3.32 GiB、无 swap 的生产机。仅管理 `csbot.service`，不重启数据库、NapCat、Steam Monitor 或整机。脚本与模板在后端仓库：`scripts/memory_guard.py`、`deploy/systemd/csbot-memory-guard.{service,timer}`、`deploy/systemd/csbot.service.d/memory.conf`。
+
+保护策略优先避免 OOM，允许短暂不可用，不等待聊天、AI 请求或观战任务结束：
+
+| 条件 | 动作 |
+| --- | --- |
+| 后端 cgroup 内存达到 1600 MiB | 重启后端 |
+| 整机 `MemAvailable` 不高于 384 MiB，且后端至少占 1024 MiB | 重启后端 |
+| 北京时间每日 05:10（允许在 05:10–05:50 窗口补执行），且后端连续运行至少 6 小时 | 重启后端 |
+| 后端 cgroup 达到 1800 MiB 硬上限 | 内核限制该服务内存；发生 cgroup OOM 时 systemd 清理整个服务并按失败策略重启 |
+
+守护任务每次结束后 60 秒再次执行。主动重启要求后端运行至少 10 分钟，防止频繁重启；硬上限在这 10 分钟内仍有效。重启会重置运行时长，日常低峰重启不会在同一窗口重复。后端已停止、正在启动或停止时跳过，不自动拉起人为停用的后端。守护任务用文件锁避免与手工执行重叠。低内存由其他服务造成且后端不足 1024 MiB 时，不反复重启后端；本方案不能保证整机永不 OOM。
+
+每次采样输出时间、后端内存、整机可用内存和运行时长到 journal，重启后再采样。停止最多等待 30 秒，超时由 systemd 清理服务进程。启动后等待最多 45 秒确认 systemd active 且 8888 HTTP 可响应；专用不存在路径返回 404 也视为 HTTP 就绪，这不代替受保护 API 和依赖验收。探测失败会使 guard 任务失败并留下日志，不在一次执行中循环重启。
+
+安装前完成本地检查、提交推送和线上 `pull --ff-only`，记录目标 commit，确认该版本已通过验收。不要将其他任务未验收的提交顺带发布。以下安装会立即重启后端，并启用持续保护：
+
+```bash
+set -e
+cd /home/ubuntu/csbot
+python3 checks/memory_guard_test.py
+python3 scripts/memory_guard.py --dry-run
+sudo -n install -m 0644 scripts/memory_guard.py /usr/local/lib/csbot-memory-guard.py
+sudo -n install -m 0644 deploy/systemd/csbot-memory-guard.service /etc/systemd/system/
+sudo -n install -m 0644 deploy/systemd/csbot-memory-guard.timer /etc/systemd/system/
+sudo -n install -d /etc/systemd/system/csbot.service.d
+sudo -n install -m 0644 deploy/systemd/csbot.service.d/memory.conf /etc/systemd/system/csbot.service.d/
+sudo -n systemd-analyze verify /etc/systemd/system/csbot-memory-guard.service /etc/systemd/system/csbot-memory-guard.timer /etc/systemd/system/csbot.service
+sudo -n systemctl daemon-reload
+sudo -n systemctl restart csbot.service
+sudo -n systemctl enable --now csbot-memory-guard.timer
+sudo -n systemctl start csbot-memory-guard.service
+systemctl show csbot.service -p ActiveState -p MemoryCurrent -p MemoryMax -p OOMPolicy
+systemctl list-timers csbot-memory-guard.timer --no-pager
+sudo -n journalctl -u csbot-memory-guard.service -n 30 --no-pager
+```
+
+同时执行本手册的发布验收。比较重启后、30 分钟、数小时及次日的采样，区分基线、缓存增长和持续累积；重启释放内存本身不能证明泄漏。后端若正常任务已需要超过 1800 MiB，应优化或扩容后调整阈值，不能把反复触顶重启当成正常运行。守护任务无外部通知渠道，失败和内存趋势需查看 journal。
+
+停用主动重启：`sudo systemctl disable --now csbot-memory-guard.timer`，并等待已启动的 guard 任务完成；这不会移除后端硬上限。需要完全回退时，另删除本节安装的 `/etc/systemd/system/csbot.service.d/memory.conf`，执行 `sudo systemctl daemon-reload`，在已授权维护窗口重启后端，再核对 `MemoryMax`。不要删除其他 drop-in 或生产数据。
+
 ## 前端发布
 
 1. 在 `csbot-front` 提交并推送 `main`。
