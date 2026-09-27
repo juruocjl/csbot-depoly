@@ -60,6 +60,8 @@ systemctl is-active mihomo docker csbot
 
 ## 后端发布
 
+涉及 DSH/Mneme AI 改造时，先完成 [AI 专项发布前置步骤](AI_RUNTIME.md#发布前准备)，包括 Node、npm 固定依赖、隔离镜像、服务身份权限与前置检查。仅 pull 并重启不足以完成该版本部署。
+
 以下在服务器执行，前提是本次后端提交已推送到 `main`：
 
 ```bash
