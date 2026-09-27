@@ -1,0 +1,2 @@
+# Local deployment credentials (including SSH private keys).
+.deploy/

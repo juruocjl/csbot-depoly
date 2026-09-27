@@ -1,0 +1,9 @@
+[submodule "csbot-front"]
+	path = csbot-front
+	url = https://github.com/juruocjl/csbot-front.git
+[submodule "csbot"]
+	path = csbot
+	url = https://github.com/juruocjl/csbot.git
+[submodule "steam_monitor_js"]
+	path = steam_monitor_js
+	url = https://github.com/juruocjl/steam_monitor_js.git
