@@ -226,3 +226,8 @@ QQ 入口补充回归：插入成功仅链接原任务，不发不存在的新�
 - 用原生HTTP提供方与原生HTML转换函数定位正文位置：页面约264K字符，200K转换结果只有6999字符导航且无DDL，300K得到10742字符并包含README的DDL功能。未通过改写上游解析器解决。
 - 最终Linux真实模型→DSH原生search→fetch复验通过，并断言工具结果实际含README中的DDL功能文本，不只检查HTTP状态。模型根据正文正确列出日程、课表、DDL与成绩查询。最终修复没有重建Docker镜像或改前端。
 - 上线后现有令牌只读API通过群/个人scope、列表/详情/搜索/分页以及未认证/越权拒绝；新3条内容和旧条目forgotten状态均与计划一致，旧手工确认原文与备份相同。后端/依赖恢复正常；备份挤压磁盘导致的启动中断和处理记录见SERVER_SERVICES.md。
+# 2026-09-30 历史原图读取修复验收
+
+- 生产只读回查会话 `fada27b9-b4b9-4fa1-ac1f-3e840fe4024e`：`csdata.image` 报告 `full_status=available`，原图为 1170×2532 的 JPEG（204901 字节），历史路径却以 `.png` 结尾；缩略图为 118×256 的 PNG。模型先读缩略图，随后读原图时 DSH 报文件扩展名与实际格式不符，于是误称只剩缩略图。原图文件仍在，未被 LRU 淘汰。
+- `scripts/check_dsh_runtime.py` 本地 mock 协议回归通过：合成 JPEG 字节保存在 `.png` 路径且无 MIME 元数据时，本轮临时 `.jpg` 视图能被原生 `read_image` 成功读取，归档字节不变；其余 DSH/Mneme 协议检查通过。
+- `scripts/check_ai_image_route.py` 在独立 Linux 验收副本用现有模型测试配置、合成图片与模拟图片查询运行。真实模型调用 `catalog → image → read_image`，读图结果 `isError=false`，回答正确描述白底蓝色矩形。没有访问生产 QQ、业务数据库或发送群消息；合成图验收不等于已重新识别该历史真实图片的文字。
