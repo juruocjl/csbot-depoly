@@ -231,3 +231,4 @@ QQ 入口补充回归：插入成功仅链接原任务，不发不存在的新�
 - 生产只读回查会话 `fada27b9-b4b9-4fa1-ac1f-3e840fe4024e`：`csdata.image` 报告 `full_status=available`，原图为 1170×2532 的 JPEG（204901 字节），历史路径却以 `.png` 结尾；缩略图为 118×256 的 PNG。模型先读缩略图，随后读原图时 DSH 报文件扩展名与实际格式不符，于是误称只剩缩略图。原图文件仍在，未被 LRU 淘汰。
 - `scripts/check_dsh_runtime.py` 本地 mock 协议回归通过：合成 JPEG 字节保存在 `.png` 路径且无 MIME 元数据时，本轮临时 `.jpg` 视图能被原生 `read_image` 成功读取，归档字节不变；其余 DSH/Mneme 协议检查通过。
 - `scripts/check_ai_image_route.py` 在独立 Linux 验收副本用现有模型测试配置、合成图片与模拟图片查询运行。真实模型调用 `catalog → image → read_image`，读图结果 `isError=false`，回答正确描述白底蓝色矩形。没有访问生产 QQ、业务数据库或发送群消息；合成图验收不等于已重新识别该历史真实图片的文字。
+- 生产更新至后端 `ba596d7fd4f0df0ce3a9dc757435253b6161cdcc` 后，针对该历史原图验证临时 `.jpg` 视图与归档同 inode，可识别为 JPEG、1170×2532，原归档未改动；服务状态与入口检查见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
