@@ -5,6 +5,7 @@
 - 新归档片段为 `['atv2', QQ号, 记录时群内显示名或null]`，只涉及被 @ 对象，不保存发言者昵称；旧 `at` 原样可读。显示文本同时保留 QQ 身份标记，取名失败不借当前昵称补历史。
 - `scripts/check_ai_outgoing.py` 仅使用 `csbot_backup`、合成群号与模拟 OneBot：验证发送前快照经延迟发件箱索引仍为旧名，接收消息在记录时捕获名片，改名后原记录与 AI 提问格式仍显示旧名，@ 元数据不进入发给 OneBot 的载荷；旧格式和 `@全体` 可读。测试合成行已清理，未发真实 QQ 消息。
 - `scripts/check_ai_image_reply.py`、`scripts/check_ai_source.py` 和语法/差异检查通过；源码白名单按审查后哈希扩为 14 个文件。AI 对话列表和详情使用已持久化的请求文本，因此无需前端改动即可显示新记录里的名字。旧记录没有该快照，不能通过重建索引恢复。
+- 生产发布后在实际后端工作区运行 `scripts/check_ai_source.py` 通过（2 项）；服务、容器、HTTP 和 Steam 就绪检查见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。生产未注入合成 @ 记录或给 QQ 群发送测试消息，因此真实 OneBot 群名片查询的端到端结果仍待新消息自然出现后观察。
 
 ## 2026-09-29 群成员头像查询纠错
 
