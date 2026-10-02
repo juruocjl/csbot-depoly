@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-10-02 80 端口个人主页上线
+
+- 后端仓库配置版本 `cf0f9ffc82d5a8b6db8c86a25a9a55f4b9d0b0ee` 已推送 GitHub 并在生产 `pull --ff-only`。新增 Compose 服务 `homepage` / 容器 `csbot-homepage`，宿主机 IPv4/IPv6 80 端口反向代理到 `https://juruocjl.github.io/`；公开入口为 `http://42.193.244.178/`。模板位于 `csbot/assets/homepage.conf`，启动策略为 `unless-stopped`，沿用已安装的 Nginx 1.29.4 镜像。
+- 本地 Compose 校验和服务器临时隔离容器的 `nginx -t` 通过；上线容器再次通过配置校验。13:58（Asia/Shanghai）从本机公网请求得到 HTTP 200、1250 字节，响应正文与原 GitHub Pages 页面逐字一致，SHA256 均为 `982fa41eba468f9f83149be6b7976196a7bb3522941d8db312372d144d0f3172`。UFW 原本 inactive，公网验收通过，未修改防火墙或云安全组。
+- 仅启动新增首页容器。原六个业务容器 ID 均保持，后端 PID `1235523`、`NRestarts=0` 与发布前一致；Mihomo、Docker、后端和内存守护 timer 均 active，CSBot 1234 前端 HTTP 200、后端不存在路由探测 404，Steam `ok/loggedOn/friendStatusReady` 均 true。生产已跟踪文件干净；无后端重启、前端构建或数据维护。
+- 原 Compose 配置、后端 commit、容器与后端运行快照保存在 `/home/ubuntu/backups/homepage-port80-20261002-5vcVFj`。入口更新和停用步骤见 [部署手册](DEPLOY.md#80-端口个人主页)。
+
 ## 2026-10-01 @ 对象历史显示名（atv2）上线
 
 - 后端 `73e4e63dfb9cd35994df45511d69f649b5544e5e` 已推送 GitHub，并在生产以 `pull --ff-only` 发布。新收到或发出的群消息仅为可见的被 @ 对象保存当时群内显示名；AI 查询和对话记录以 `@当时昵称([at:QQ号])` 展示。旧 `at` 仍可读，旧历史不回填；本次无前端改动或数据库迁移。
@@ -118,6 +125,8 @@
 
 ```mermaid
 flowchart LR
+    HomepageBrowser[浏览器 :80] --> Homepage[csbot-homepage :80]
+    Homepage -->|HTTPS| Pages[juruocjl.github.io]
     Browser[浏览器 :1234] --> Nginx[csbot-nginx :80]
     Nginx --> Static[dist / build-output]
     Nginx -->|/api/ → host.docker.internal:8888| Backend[csbot.service]
@@ -131,6 +140,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | 后端 | systemd + uv | `0.0.0.0:8888` | `/home/ubuntu/csbot/.env.prod` |
 | Nginx | `nginx:alpine` | 所有地址 TCP 1234 → 容器 80 | `assets/default.conf`、`dist/`、`imgs/` |
+| 个人主页 Nginx（2026-10-02 新增） | `nginx:alpine` | 所有地址 TCP 80 → 容器 80 | `assets/homepage.conf`，只读挂载；上游 GitHub Pages |
 | PostgreSQL | `postgres:15-alpine` | 所有地址 TCP 5432 | `pg_data/` |
 | Adminer | `adminer` | 所有地址 TCP 8081 → 容器 8080 | 无持久卷 |
 | NapCat | `mlikiowa/napcat-docker:latest` | 所有地址 TCP 6099 | `napcat/config/`、`ntqq/` |
@@ -166,6 +176,7 @@ flowchart LR
 3. CSBot Compose 项目：`/home/ubuntu/csbot/docker-compose.yml`
    - `csbot-database`：PostgreSQL，端口 5432。
    - `csbot-nginx`：前端静态文件和反向代理，端口 1234。前端没有单独运行时服务。
+   - `csbot-homepage`：个人主页反向代理，端口 80；上游 `https://juruocjl.github.io/`。
    - `csbot-napcat`：QQ/NapCat，端口 6099。
    - `csbot-adminer-1`：Adminer，端口 8081。
 4. Steam Monitor Compose 项目：`/home/ubuntu/steam_monitor_js/compose.yaml`
@@ -218,6 +229,7 @@ sudo docker compose -f /home/ubuntu/steam_monitor_js/compose.yaml ps
 sudo docker compose -f /home/ubuntu/ts/docker-compose.yml ps
 curl -fsS --max-time 5 http://127.0.0.1:5555/api/health
 curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
+curl -fsS --max-time 40 http://127.0.0.1/ -o /dev/null
 journalctl -u mihomo.service -u csbot.service -n 100 --no-pager
 ```
 
@@ -230,6 +242,7 @@ Steam Monitor 应显示 `healthy`，其 `/api/health` 应包含 `loggedOn=true` 
 - `/home/ubuntu/csbot/imgs`
 - `/home/ubuntu/csbot/napcat` 和 `/home/ubuntu/csbot/ntqq`
 - `/home/ubuntu/csbot/dist` 和 `/home/ubuntu/csbot/assets/default.conf`
+- `/home/ubuntu/csbot/assets/homepage.conf`
 - `/home/ubuntu/clashctl/resources`、`/home/ubuntu/clashctl/bin/mihomo` 和代理配置
 - `/home/ubuntu/steam_monitor_js/.env`、`/home/ubuntu/steam_monitor_js/data` 和 `compose.yaml`
 - `/home/ubuntu/ts/data` 和 `/home/ubuntu/ts/docker-compose.yml`

@@ -12,6 +12,7 @@
 | 前端 | `csbot-front/main` 经 GitHub Actions 生成 `build-output` | `/home/ubuntu/csbot/dist` 是独立 Git 仓库；由 `csbot-nginx` 提供静态文件 |
 | Steam Monitor | `steam_monitor_js/main` | `/home/ubuntu/steam_monitor_js`；Docker Compose 构建镜像 |
 | PostgreSQL / Nginx / NapCat / Adminer | `csbot/docker-compose.yml` | `/home/ubuntu/csbot` 的 Compose 项目 |
+| 个人主页入口 | `csbot/docker-compose.yml`、`csbot/assets/homepage.conf` | `csbot-homepage`，宿主机 80 端口反向代理到 `https://juruocjl.github.io/` |
 | Mihomo / TeamSpeak | 服务器既有配置 | 见服务清单；TeamSpeak 未包含在三个子模块中 |
 
 服务器当前没有改为部署本父仓库。父仓库子模块固定源码版本，现行脚本仍拉取子仓库分支；因此不能把父仓库 commit 当成已经发布的版本凭据。
@@ -158,6 +159,29 @@ curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
 ```
 
 静态文件通过 bind mount 直接供 Nginx 读取，无单独前端进程。只更新静态文件通常无需重启后端；涉及后端契约的变更应协调两者发布。修改 Nginx 模板或 Compose 配置时需另行验证配置并应用到容器，单纯拉取文件不能保证运行中配置已经更新。
+
+## 80 端口个人主页
+
+`csbot` Compose 的 `homepage` 服务使用独立 Nginx 容器 `csbot-homepage`，映射宿主机 `80:80`。配置源为 `csbot/assets/homepage.conf`，在生产只读挂载至 `/etc/nginx/conf.d/default.conf`；原 CSBot 前端仍由 `csbot-nginx` 的 1234 端口提供。
+
+主页请求通过 HTTPS 转发到 `https://juruocjl.github.io/`，保留路径和查询参数；配置使用 Docker DNS 定期解析上游，设置 GitHub Pages 的 Host/SNI 并校验上游证书。此入口依赖服务器能访问 GitHub Pages，页面内容由上游站点更新，无需发布 `csbot-front` 构建产物。访问地址为 `http://42.193.244.178/`。
+
+先按本手册完成本地检查、提交推送、线上已跟踪文件与分支检查，再在服务器执行：
+
+```bash
+set -e
+cd /home/ubuntu/csbot
+git pull --ff-only origin main
+sudo -n docker compose config --quiet
+sudo -n docker compose run --rm --no-deps --pull never homepage nginx -t
+sudo -n docker compose up -d --no-deps --pull never --force-recreate homepage
+sudo -n docker exec csbot-homepage nginx -t
+curl -fsS --max-time 40 http://127.0.0.1/ -o /dev/null
+```
+
+上述命令沿用服务器已安装的 `nginx:alpine` 镜像；首次恢复须先准备该镜像。配置文件被 Git 替换后，须重建 `homepage` 以刷新单文件 bind mount。仅操作 `homepage`，并执行本手册的业务验收；另从公网检查 80 端口 HTTP 200 和首页内容。2026-10-02 发布时公网已可达，无需调整主机防火墙或云安全组。
+
+停用入口可执行 `sudo -n docker compose stop homepage`；配置回退通过 revert 提交及正常 Git 发布流程完成。此服务没有业务数据卷，不涉及数据库迁移。
 
 ## Windows 既有发布脚本
 
