@@ -79,6 +79,16 @@ df -h /
 
 硬链接图片备份可能继续持有被 LRU 淘汰的磁盘块。多次 `du` 会因遍历顺序把共享块算在不同目录，不能将各次结果直接相加；评估回收量应按 inode 去重并核实链接数。不要把图片备份存在解释为 LRU 未执行。
 
+## NapCat 镜像更新
+
+NapCat 由后端 Compose 的 `napcat` 服务管理。`latest` 标签不会随容器重启自动更新；用户授权升级后，先保留当前运行镜像的独立回滚标签，再执行 `docker compose pull napcat`，记录拉取摘要和实际运行版本。仅拉取镜像不会切换现有容器。
+
+重建前核对生产已跟踪文件与 Compose，检查磁盘余量；停止 NapCat 后将 `napcat/config` 和 `ntqq` 制作成私有一致性归档，逐文件比较并保存 SHA256。备份失败应先恢复原容器，不能继续升级。不要输出 WebUI/OneBot 令牌或丢弃 QQ 会话。
+
+检查新镜像 entrypoint 和包内默认配置：首次解包可能覆盖持久卷里的通用 `napcat.json`，升级前须比较并保留已有设置。2026-10-05 的镜像包只含默认 `config/napcat.json`，它与生产内容一致；不能据此假设未来镜像不会覆盖其他文件。准备就绪后在 `/home/ubuntu/csbot` 运行 `sudo -n docker compose up -d --no-deps --pull never --force-recreate napcat`，仅重建 NapCat；如需修改受版本控制的 Compose，仍按 Git 发布流程先提交、推送和服务器 `pull --ff-only`。
+
+验收须包括运行日志中的 NapCat/QQ 版本、实际镜像 ID、配置比对、QQ 在线状态、OneBot 连接及自然群消息处理，并区分接收验证与发送验证。旧镜像与会话备份保留；回滚前评估新版 QQ 数据兼容性，需恢复会话时先停 NapCat，再从已校验归档恢复。具体版本与备份见 [服务清单](SERVER_SERVICES.md#2026-10-05-qq-收发恢复与-napcat-升级)。
+
 ## 后端发布
 
 涉及 DSH/Mneme AI 改造时，先完成 [AI 专项发布前置步骤](AI_RUNTIME.md#发布前准备)，包括 Node、npm 固定依赖、隔离镜像、服务身份权限与前置检查。仅 pull 并重启不足以完成该版本部署。

@@ -1,5 +1,14 @@
 # CSBot 服务器服务清单
 
+## 2026-10-05 QQ 收发恢复与 NapCat 升级
+
+- 15:37 图片回复报 `rich media transfer failed`，随后 QQ 资料查询连续超时；15:44:15 后停止接收群消息，16:42/16:44 定时通知返回 QQ 错误 `1006514`（网络连接异常）。后端、OneBot 心跳及其他服务仍运行。16:46 重启 NapCat 后，16:47 的真实群 @ 消息完成 AI 回复，16:48 直播通知成功发送。日志只能定位到 QQ 客户端收发连接异常，不能据此断言底层断线原因。
+- 用户授权升级后，按现有 Compose 拉取 `mlikiowa/napcat-docker:latest`，16:53:21（Asia/Shanghai）仅重建 `csbot-napcat`。运行日志确认 NapCat **4.18.19 → 4.18.30**、QQ **3.2.21-42086 → 3.2.32-52194**。后端源码仍为 `e1af04ad26e129bfa397a462acfa7eacd6287d70`，未发布本机其他未提交修改。
+- 新镜像 ID：`sha256:321f3fee12a970c7df372b303f9b354fed200e8abaf214dc664b3121893999f6`；拉取摘要：`mlikiowa/napcat-docker@sha256:335f9310198504d8d07aba91cc91d89215269891919c26eb4e46052ff8bb176d`。旧镜像保留为 `mlikiowa/napcat-docker:before-20261005`（ID `sha256:f1014cc1c4d01d76ba7a6e3b87e111347c399af3cd1cebe98c3192f610785913`）。
+- 私有备份：`/home/ubuntu/backups/napcat-update-20261005-e8qy5i/`，包含旧 Compose、前后镜像标识、容器快照和 `qq-config-session.tar.gz`（713601292 字节）。归档在 NapCat 停止后生成，`tar --compare` 逐文件核验成功，SHA256 回执为 `backup.sha256`。升级后 8 个 NapCat 配置文件与归档逐字相同，QQ 会话保留并自动登录。
+- 升级后 WebUI 只读状态 `isLogin=true/isOffline=false/loginPhase=ready/coreReady=true`，OneBot 重新连接；16:54–16:55 的自然群文字/图片事件进入后端并完成处理，无升级后 NapCat 错误。未主动向群发送验收消息，升级后的主动回复/图片发送尚未单独验收；前述 AI 回复与直播发送成功发生在升级前恢复阶段。
+- 后端 PID `2517183`、`NRestarts=0` 保持；其余六个容器 ID 不变，Mihomo/Docker/后端/内存守护 timer active，前端 HTTP 200，Steam `ok/loggedOn/friendStatusReady` 均 true，生产已跟踪文件干净。备份完成后根盘可用约 11861 MiB。
+
 ## 2026-10-03 斗鱼监控修复上线
 
 - 后端 `e1af04ad26e129bfa397a462acfa7eacd6287d70` 已推送 GitHub，完成本地与服务器独立工作区验收后，在用户明确授权“上线”后经生产 `pull --ff-only` 发布。15:10（Asia/Shanghai）重启后端，MainPID `1839772`、`NRestarts=0`；插件启动成功。验收见 [DELIVERY_CHECK.md](DELIVERY_CHECK.md#2026-10-03-斗鱼开播与回放监控修复)。无前端改动、依赖新增或数据库迁移。
