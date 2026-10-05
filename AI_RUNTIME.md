@@ -21,7 +21,7 @@ QQ 进度通知和补充回复链接使用 UUID 去掉连字符后的末 12 位�
 
 `POST /api/ai/resolve` 在现有登录鉴权后解析长短编号。群回复/报告仅本群可读，网页记录仅本群本人可读；未知归属、越权、缺失均返回 404。网页接收完整 UUID 或短 ID；短 ID 解析成功后通过 `router.replace` 换成完整 UUID，保留其他 query 与 hash，然后沿用原 SSE 和详情接口。长 UUID 链接继续兼容；解析失败不订阅 SSE，也不会重新提交问题。
 
-本轮尚未生产发布。未来发布前用 SQLite backup API 备份 `data/ai/state.sqlite3`，检查备份完整性；该表属于运维 SQLite，不生成 PostgreSQL 业务迁移、不重建沙箱镜像。先按 Git 发布后端，再等待前端源码对应 Actions 构建成功，按 DEPLOY.md 更新 `build-output`；保留后端、前端源码和产物 commit。代码回退可保留新增映射表。
+2026-10-05 已按用户授权发布，版本与备份见 [服务清单](SERVER_SERVICES.md#2026-10-05-ai-短链接与代理抓取发布)。后续发布前用 SQLite backup API 备份 `data/ai/state.sqlite3`，检查备份完整性；该表属于运维 SQLite，不生成 PostgreSQL 业务迁移、不重建沙箱镜像。先按 Git 发布后端，再等待前端源码对应 Actions 构建成功，按 DEPLOY.md 更新 `build-output`；保留后端、前端源码和产物 commit。代码回退可保留新增映射表。
 
 ### 上下文摄取
 

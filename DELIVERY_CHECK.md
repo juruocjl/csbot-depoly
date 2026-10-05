@@ -6,7 +6,8 @@
 - 后端 `scripts/check_ai_short_ids.py` 6 项通过：12/16/20 位冲突分配、旧链接不改向、重启稳定、旧 SQLite 补齐、映射失败事务回滚、群/个人权限、大小写兼容，以及实际 FastAPI 路由鉴权先于解析、越权/缺失同为 404。仅临时 SQLite 和模拟登录依赖，不连接业务数据库。现有对话列表 1 项、边界 4 项、QQ 图片/补充通知与源码 2 项回归通过，平台发送仍为模拟 OneBot。
 - 前端短 ID 4 项与过程显示 4 项检查、生产构建通过；新解析工具的独立严格 TypeScript 检查通过。现有全量 `vue-tsc` 在执行前因旧版工具与当前 TypeScript 不兼容报 `Search string not found`，不计为通过。
 - 本地 Chrome 实际运行构建页面，模拟 API 验证：未登录保留短链接到登录回跳、规范化保留其他 query/hash、解析后只打开一次完整 UUID SSE、长链接跳过解析、404 不开 SSE、解析期间返回列表后迟到响应不跳回。无真实模型调用、业务库访问或 QQ 测试消息。
-- 后端 `f4a27c329a06ad8ad27a0631d0c372f2cc578bfb`、前端源码 `82000a3f7efbe27ca8fd29f3af33e32013f6f567` 已推送并核对 GitHub main 一致；对应 [Actions 构建](https://github.com/juruocjl/csbot-front/actions/runs/37304939856) 成功，产物 `a24f8dd83982a96f0ff30c4683d9a0f8c4ec3c99` 的提交信息确认来源为该源码版本。仍待生产发布；新增运维 SQLite `run_aliases` 表的备份与发布顺序见 [AI_RUNTIME.md](AI_RUNTIME.md#对话短链接)。
+- 后端 `f4a27c329a06ad8ad27a0631d0c372f2cc578bfb`、前端源码 `82000a3f7efbe27ca8fd29f3af33e32013f6f567` 已推送并核对 GitHub main 一致；对应 [Actions 构建](https://github.com/juruocjl/csbot-front/actions/runs/37304939856) 成功，产物 `a24f8dd83982a96f0ff30c4683d9a0f8c4ec3c99` 的提交信息确认来源为该源码版本。新增运维 SQLite `run_aliases` 表的备份与发布顺序见 [AI_RUNTIME.md](AI_RUNTIME.md#对话短链接)。
+- 用户随后授权部署。独立 Linux 验收目录经 GitHub `pull --ff-only` 更新到 `f4a27c3`，上述后端检查和代理抓取 9 项通过；21:57 生产完成后端及前端产物快进更新。现有令牌通过真实生产 API 验证长短 ID/大小写解析、未登录拒绝、缺失/无效 ID 返回 404；全部 267 条旧记录已有固定映射，静态 JS HTTP 200、类型为 JavaScript 且包含解析接口。线上没有其他群或其他用户的记录可作越权样本，跨群/个人权限依靠独立 Linux 夹具验证；未新建令牌、生产测试记录或 QQ 消息。生产代理工具通过本机 7890 读取 example.com，HTTP 200、未截断，正文含 Example Domain。服务、版本及备份见 [服务清单](SERVER_SERVICES.md#2026-10-05-ai-短链接与代理抓取发布)。
 
 ## 2026-10-05 AI 可选择代理抓取
 

@@ -1,5 +1,11 @@
 # CSBot 服务器服务清单
 
+## 2026-10-05 AI 短链接与代理抓取发布
+
+- 用户授权“部署”后，21:57（Asia/Shanghai）生产后端从 `e1af04ad26e129bfa397a462acfa7eacd6287d70` 经 GitHub `pull --ff-only` 更新为 `f4a27c329a06ad8ad27a0631d0c372f2cc578bfb`，包含短链接及此前已验收的可选择代理抓取。前端源码 `82000a3f7efbe27ca8fd29f3af33e32013f6f567` 的 Actions 成功后，线上独立 `dist` 仓库从 `27954f82b8adec1cf99ba93c357b217f2e56ca50` 快进至产物 `a24f8dd83982a96f0ff30c4683d9a0f8c4ec3c99`。没有依赖、Nginx/Compose、沙箱镜像或 Steam Monitor 版本改动。
+- 发布前已跟踪文件干净，运行/排队 AI 与 pending/sent 发件箱均 0；暂停内存守护并停止后端，用 SQLite backup API 保存状态库至私有目录 `/home/ubuntu/backups/ai-short-links-20261005-LUsLxo/state-before.sqlite3`，`integrity_check=ok`，同目录保存前后端原版本及服务/容器快照。新增运维表 `run_aliases` 为 267 条旧记录补齐映射，没有 PostgreSQL 业务迁移、记忆/图片维护或生产测试数据写入。
+- 后端及内存守护已恢复；最终 MainPID `2820255`、`NRestarts=0`，Mihomo/Docker active，7 个容器运行且 ID 与发布前相同；前端 HTTP 200、真实 JS 资源可读、后端不存在路由探测 404，Steam `ok/loggedOn/friendStatusReady` 均 true，OneBot WebSocket accepted 且保持连接，启动后无 traceback。生产工作区已跟踪文件干净，备份后磁盘可用约 11790 MiB。受保护短链接 API 与代理读取验收见 [DELIVERY_CHECK.md](DELIVERY_CHECK.md#2026-10-05-ai-对话短链接)。未调用模型或向真实 QQ 群发送测试消息，实际 QQ 短链接通知由后续正常使用验证。
+
 ## 2026-10-05 QQ 收发恢复与 NapCat 升级
 
 - 15:37 图片回复报 `rich media transfer failed`，随后 QQ 资料查询连续超时；15:44:15 后停止接收群消息，16:42/16:44 定时通知返回 QQ 错误 `1006514`（网络连接异常）。后端、OneBot 心跳及其他服务仍运行。16:46 重启 NapCat 后，16:47 的真实群 @ 消息完成 AI 回复，16:48 直播通知成功发送。日志只能定位到 QQ 客户端收发连接异常，不能据此断言底层断线原因。
