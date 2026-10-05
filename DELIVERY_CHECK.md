@@ -1,5 +1,13 @@
 # 本地交付验收
 
+## 2026-10-05 AI 对话短链接
+
+- QQ 进度和补充回复使用固定短 ID，默认 UUID 末 12 位，碰撞时延长新记录的 ID；前端解析后替换为完整 UUID，再订阅原 SSE。旧长链接兼容，访问权限与对话列表一致。
+- 后端 `scripts/check_ai_short_ids.py` 6 项通过：12/16/20 位冲突分配、旧链接不改向、重启稳定、旧 SQLite 补齐、映射失败事务回滚、群/个人权限、大小写兼容，以及实际 FastAPI 路由鉴权先于解析、越权/缺失同为 404。仅临时 SQLite 和模拟登录依赖，不连接业务数据库。现有对话列表 1 项、边界 4 项、QQ 图片/补充通知与源码 2 项回归通过，平台发送仍为模拟 OneBot。
+- 前端短 ID 4 项与过程显示 4 项检查、生产构建通过；新解析工具的独立严格 TypeScript 检查通过。现有全量 `vue-tsc` 在执行前因旧版工具与当前 TypeScript 不兼容报 `Search string not found`，不计为通过。
+- 本地 Chrome 实际运行构建页面，模拟 API 验证：未登录保留短链接到登录回跳、规范化保留其他 query/hash、解析后只打开一次完整 UUID SSE、长链接跳过解析、404 不开 SSE、解析期间返回列表后迟到响应不跳回。无真实模型调用、业务库访问或 QQ 测试消息。
+- 后端 `f4a27c329a06ad8ad27a0631d0c372f2cc578bfb`、前端源码 `82000a3f7efbe27ca8fd29f3af33e32013f6f567` 已推送并核对 GitHub main 一致；对应 [Actions 构建](https://github.com/juruocjl/csbot-front/actions/runs/37304939856) 成功，产物 `a24f8dd83982a96f0ff30c4683d9a0f8c4ec3c99` 的提交信息确认来源为该源码版本。仍待生产发布；新增运维 SQLite `run_aliases` 表的备份与发布顺序见 [AI_RUNTIME.md](AI_RUNTIME.md#对话短链接)。
+
 ## 2026-10-05 AI 可选择代理抓取
 
 - 新增 `web_fetch_proxy(url)`，通过预设回环 HTTP 代理抓取匿名公网页面，保留直接 `web_fetch`。默认端口按服务器只读配置核实为 Mihomo HTTP 7890；模型不接收代理地址或认证参数，`CS_AI_FETCH_PROXY_URL` 空值可关闭代理工具。配置与访问边界见 [AI_RUNTIME.md](AI_RUNTIME.md)。
