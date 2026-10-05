@@ -1,5 +1,12 @@
 # 本地交付验收
 
+## 2026-10-05 AI 可选择代理抓取
+
+- 新增 `web_fetch_proxy(url)`，通过预设回环 HTTP 代理抓取匿名公网页面，保留直接 `web_fetch`。默认端口按服务器只读配置核实为 Mihomo HTTP 7890；模型不接收代理地址或认证参数，`CS_AI_FETCH_PROXY_URL` 空值可关闭代理工具。配置与访问边界见 [AI_RUNTIME.md](AI_RUNTIME.md)。
+- `node --test scripts/check_ai_proxy_fetch.mjs` 本地9项通过：固定代理配置、CONNECT目标为校验后的公网IP、原Host和TLS SNI/证书校验保留、私网IP/localhost/认证URL拒绝、同源与跨域重定向、响应限额、超时/取消和代理故障不自动直连。TLS使用临时自签测试证书和模拟代理，密钥已随临时目录清理。
+- `scripts/check_ai_web.py` 使用模拟模型/搜索和回环代理完成真实DSH工具协议验收：模型schema含新工具、代理HTML正常解析、内网/认证URL拒绝、只发生一次预期CONNECT，直连/代理/搜索共用预算，搜索凭据不进入模型请求。`check_dsh_runtime.py` 现有会话/记忆/文件/图片/输出审查回归、源码白名单和语法/差异检查通过；不连接业务库或发送QQ测试消息。
+- 独立 Linux 验收工作区经 GitHub `pull --ff-only` 更新到后端 `4409b60eb2db17a13f81581f7c014eb11b67df63`，Node 24.14.0 下代理9项、DSH网页工具集成与源码2项检查通过。新 provider 从该工作区实际通过 `http://127.0.0.1:7890` 读取 `https://example.com/`，HTTP 200、HTML正文含 Example Domain、未截断，单次约1.04秒；未调用真实模型、业务库或QQ。生产后端仍为 `e1af04a`，本轮实现已推送，尚未生产发布。
+
 ## 2026-10-03 斗鱼开播与回放监控修复
 
 - 后端修复提交 `e1af04ad26e129bfa397a462acfa7eacd6287d70` 已推送 GitHub。移除已停服的“在看直播”（`doseeing.com`）第三方 HTML 抓取，改读斗鱼官方 `betard` 房间信息；靓号失败后只从官方移动页面解析真实 ID，再读取带回放字段的房间接口。未采用会将 `6657` 返回成另一房间的旧 `open.douyucdn.cn` 接口。
