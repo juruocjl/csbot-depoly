@@ -1,5 +1,13 @@
 # CSBot 服务器服务清单
 
+## 2026-10-06 完整 metadata、成员身份与本轮上下文发布
+
+- 用户授权“部署”后，08:30（Asia/Shanghai）生产后端由 `f4a27c329a06ad8ad27a0631d0c372f2cc578bfb` 经 GitHub `pull --ff-only` 更新为 `13103fd6dd76cb09d193b153d3ac24d9375cddb1`。前端源码 `f3e63eb5f7da0187b02a55430495e2541e506dc4` 的 [Actions 37329704087](https://github.com/juruocjl/csbot-front/actions/runs/37329704087) 已 success；线上独立 dist 仓库由 `a24f8dd83982a96f0ff30c4683d9a0f8c4ec3c99` 快进至产物 `46631aa299731c0f09c34a83ec0b755f085ddc4e`。无依赖/镜像、Compose/Nginx、Steam Monitor、数据库结构或索引重建变更。
+- 发布前跟踪文件干净、排队/运行AI及pending/sent发件箱均0。暂停内存守护并停止后端，将完整 `data/ai` 复制至 `/home/ubuntu/backups/ai-metadata-identity-20261006-bxzZ4j/ai`，370个文件SHA256和符号链接目标逐项一致；另用SQLite backup API生成 `state-before.sqlite3`，277条旧run、integrity_check=ok。原后端/前端版本、systemd和容器状态保存在同目录，未删除历史数据或图片。
+- 在ubuntu服务身份、docker附加组及同样PATH下运行严格 transient preflight，固定DSH/Mneme、源码哈希、真实隔离容器执行、两库只读schema、Steam就绪和空间检查通过。恢复后端与内存守护timer；08:35后端MainPID `3009822`、NRestarts=0、内存约674MiB。Mihomo/Docker/后端/守护timer active，7个容器ID与发布前一致，前端HTTP200、后端不存在路由404，Steam ok/loggedOn/friendStatusReady均true，生产跟踪文件干净，磁盘约11436MiB可用。
+- 现有令牌只读验收新版上下文API和静态资源成功。真实Chrome验证用户给出的旧记录能展开系统提示、群聊资料、运行时资料三项并保留reply505332和原match ID；匿名/不存在记录拒绝。线上没有可用的其他群/其他发起人样本，跨群/网页所有者隔离已由发布前Linux夹具验证，没有在生产造假记录测试。
+- 独立网页验收会话 `e86faed5-562c-428e-99aa-e4cc5d047836` 通过线上模型实际调用隔离Python与授权csdata.image；身份映射当前SteamID→QQ→OneBot群名片/昵称的脚本断言通过，真实沙箱exit_code=0，保存4项新context事件。没有向QQ发送验收消息；该网页个人会话与QQ群记忆隔离。线上截图浏览器也取得含10个SteamID的完整业务响应且不包含token。旧纯昵称metadata仍不能可靠反推历史身份。
+
 ## 2026-10-05 AI 短链接与代理抓取发布
 
 - 用户授权“部署”后，21:57（Asia/Shanghai）生产后端从 `e1af04ad26e129bfa397a462acfa7eacd6287d70` 经 GitHub `pull --ff-only` 更新为 `f4a27c329a06ad8ad27a0631d0c372f2cc578bfb`，包含短链接及此前已验收的可选择代理抓取。前端源码 `82000a3f7efbe27ca8fd29f3af33e32013f6f567` 的 Actions 成功后，线上独立 `dist` 仓库从 `27954f82b8adec1cf99ba93c357b217f2e56ca50` 快进至产物 `a24f8dd83982a96f0ff30c4683d9a0f8c4ec3c99`。没有依赖、Nginx/Compose、沙箱镜像或 Steam Monitor 版本改动。
