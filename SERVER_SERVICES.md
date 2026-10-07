@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-10-07 AI管理员仅使用机器人自维护状态发布
+
+- 用户授权“部署”后，08:56（Asia/Shanghai）生产后端经 GitHub `pull --ff-only` 从 `13103fd6dd76cb09d193b153d3ac24d9375cddb1` 更新为 `5c3c931544641b6d0b881f948a026dca6caa6615`。管理员查询只读机器人 `adminqq/adminqqalive`，成员查询不保存/返回QQ角色；工具目录、SQL状态描述、系统提示和DATA.md已同步口径。前端产物仍为 `46631aa299731c0f09c34a83ec0b755f085ddc4e`，无业务权限、依赖、镜像或数据库结构变更。
+- 发布前跟踪文件干净、运行/排队AI和未确认发件箱均0；独立Linux验收的管理员7项与源码2项通过。停服后将完整AI状态、图片及 `.env/.env.prod` 保存至私有目录 `/home/ubuntu/backups/ai-bot-admin-20261007-M3DPpZ`，58975个数据文件及配置的SHA256、符号链接目标校验通过；SQLite backup API生成 `state-before.sqlite3`，293条run、integrity_check=ok。首轮因系统Python缺少file_digest中止，旧服务自动恢复且代码未更新，复制目录 `/home/ubuntu/backups/ai-bot-admin-20261007-r9fhJp` 保留；随后以服务Python创建并校验上述新备份。
+- ubuntu服务身份、docker附加组与相同PATH下的严格preflight通过：Node22.22.0/固定DSH-Mneme、源码哈希、真实隔离容器、两库只读schema、Steam就绪及空间检查。后端MainPID `3438591`、NRestarts=0、验收后内存约720MiB；Mihomo/Docker/后端/守护timer均active，7个容器ID和前端版本与发布前相同，前端HTTP200、OneBot已连接、无Traceback，Steam ok/loggedOn/friendStatusReady均true且reconnectStopped=false，跟踪文件干净，磁盘5686MiB可用。
+- 既有令牌的独立网页验收run `19d7f3ef-1ee3-43d7-87d6-f34e21c07101` 中，真实模型执行1次隔离Python，group_admins与本群授权SQL自维护状态一致，group_members/member_info无role，改名规则包含adminqqalive条件；保存的实际工具结果exit_code=0且断言成功，4项新context含新版系统提示。未向QQ发验收消息，未执行迁移/索引重建。验收结束时运行/排队AI和未确认发件箱均0。
+
 ## 2026-10-06 完整 metadata、成员身份与本轮上下文发布
 
 - 用户授权“部署”后，08:30（Asia/Shanghai）生产后端由 `f4a27c329a06ad8ad27a0631d0c372f2cc578bfb` 经 GitHub `pull --ff-only` 更新为 `13103fd6dd76cb09d193b153d3ac24d9375cddb1`。前端源码 `f3e63eb5f7da0187b02a55430495e2541e506dc4` 的 [Actions 37329704087](https://github.com/juruocjl/csbot-front/actions/runs/37329704087) 已 success；线上独立 dist 仓库由 `a24f8dd83982a96f0ff30c4683d9a0f8c4ec3c99` 快进至产物 `46631aa299731c0f09c34a83ec0b755f085ddc4e`。无依赖/镜像、Compose/Nginx、Steam Monitor、数据库结构或索引重建变更。

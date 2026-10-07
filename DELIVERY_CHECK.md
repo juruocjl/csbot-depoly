@@ -1,11 +1,12 @@
 # 本地交付验收
 
-## 2026-10-07 AI管理员仅使用机器人自维护状态（待部署）
+## 2026-10-07 AI管理员仅使用机器人自维护状态（已部署）
 
 - `group_admins` 改为只读本群 `adminqq/adminqqalive`，返回在位者及设置昵称资格；不调用QQ接口。`group_members/member_info` 和图片身份关联使用的成员快照不保存或返回QQ角色。
 - 更新工具目录、SQL状态描述、每轮DATA.md和系统提示，移除“active也须QQ角色核验”及“QQ实际角色为准”，明确旧工具结果里的QQ角色不作当前依据。竞选/改名业务逻辑未改变。
 - 本地 `check_group_knowledge.py` 7项通过：QQ错误地报告已撤销者为admin时不泄露角色或授予资格；QQ不可用时仍能查询自维护状态；下放、缺失状态返回无在位者，错误或截断状态拒绝确认。头像、分页、群隔离和业务日原有检查通过。
-- `check_ai_boundaries.py` 4项、`check_ai_source.py` 2项、`check_image_identity.py` 7项通过；审查并更新14文件源码哈希。未连接生产库测试，未重启服务或向QQ群发消息。
+- `check_ai_boundaries.py` 4项、`check_ai_source.py` 2项、`check_image_identity.py` 7项通过；审查并更新14文件源码哈希。上述本地检查未连接生产库或向QQ群发消息。
+- 08:56（Asia/Shanghai）按用户授权将生产后端快进至 `5c3c931544641b6d0b881f948a026dca6caa6615`，Linux管理员7项/源码2项及服务身份严格preflight通过。独立网页验收run `19d7f3ef-1ee3-43d7-87d6-f34e21c07101` 的真实模型执行1次隔离Python：管理员结果与授权SQL自维护状态一致、group_members/member_info均无role、规则包含实际改名条件；核验保存的工具结果exit_code=0及成功标记，4项本轮context含新版系统提示。服务、OneBot、Steam和前端HTTP验收通过，版本与备份见SERVER_SERVICES.md。
 
 ## 2026-10-05 AI 对话短链接
 

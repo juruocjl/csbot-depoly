@@ -243,7 +243,7 @@ apply 获取与后端相同的独占状态锁，后端运行时拒绝操作；�
 
 在原有 `csdata.call()` 中增加 `group_members/member_info/member_avatar/group_admins/election_rules/points_today`，模型工具数量不变；SQL新增 `group_people/points/election_state` 逻辑表及相应模板。调用参数、示例与口径随每轮 DATA.md 提供；查询当前成员不要求绑定Steam。
 
-- OneBot 每轮按授权群拉取一次成员昵称/群名片快照，不向AI提供QQ角色。`group_admins` 仅查询本群 `adminqq/adminqqalive`，返回 `active_uid/selected_uid/set_nickname_allowed_uid` 及原始竞选状态，QQ连接失败也不影响此查询。机器人管理员和特权以自维护状态及实际命令条件为准，不能用陈旧QQ角色核验。此边界调整于2026-10-07完成本地检查并待部署。
+- OneBot 每轮按授权群拉取一次成员昵称/群名片快照，不向AI提供QQ角色。`group_admins` 仅查询本群 `adminqq/adminqqalive`，返回 `active_uid/selected_uid/set_nickname_allowed_uid` 及原始竞选状态，QQ连接失败也不影响此查询。机器人管理员和特权以自维护状态及实际命令条件为准，不能用陈旧QQ角色核验。此边界调整于2026-10-07已部署，版本与备份见 [服务清单](SERVER_SERVICES.md#2026-10-07-ai管理员仅使用机器人自维护状态发布)。
 - 头像只接受本群QQ号；后端从固定QQ CDN地址取图，不接受任意URL/平台API。禁止跳转，下载≤2MiB、解码≤400万像素，规范化最长640像素PNG以供DSH直接读取；进入私有图片缓存，共享原图1GiB LRU与永久缩略图。返回路径只对当前轮的read_image开放，持有读取租约，不自动发送头像，不给沙箱开放网络。
 - 2026-09-29纠错：一次“头像是谁”的回复只看到`avatar_url`，把该网址交给`read_image`后得到通用文件错误，误称头像不可读。每轮系统提示和DATA.md现在明确要求：当前本群成员QQ头像先`csdata.call('member_avatar',uid=...)`，再`read_image`读取返回的`full_path`；URL不等于文件路径。DSH文件工具若收到URL会返回带正确调用路径的错误，不把它说成缓存淘汰。实际QQ成员或CDN故障仍按具体错误说明；普通答复不附状态字段或路径。
 - 复读点数按原功能23:55业务日计算，普通点/奖励点/惩罚触发数分别返回。自写SQL中的points按完整group_群号_QQ键限定，election_state只开放本群3个白名单键，不开放任意local_storage或完整user_info。
