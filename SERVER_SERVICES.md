@@ -1,5 +1,14 @@
 # CSBot 服务器服务清单
 
+## 2026-10-13 主域与通配符证书共用及个人主页 HTTPS 上线
+
+- 配置版本 `6028c4e8b417ab1b42f2242708c64b59c96f2b66` 已推送 GitHub。先在服务器独立检出目录经 `pull --ff-only` 安装签发任务，沿用已注册的 ACME 账户和现有阿里云 DNS 凭据；18:01 签发成功后再更新生产检出目录。证书由 Let's Encrypt YE2 签发，SAN 为 `ave-mujica.top`、`*.ave-mujica.top`，有效期至 2027-01-11；未新建账户或 DNS 凭据。
+- `csbot-homepage` 新增宿主机 443 映射，入口 `https://ave-mujica.top/`。主域 HTTPS 和原 IP HTTP 均返回 200，响应正文与已提交静态 HTML 一致，备案页脚保留；公网 HTTPS 单次样本约 116 毫秒。主页仍由本地文件直接提供，无上游页面请求。
+- 公网可信 TLS 握手验证主页 443 与 DERP 8443 的实际叶证书 SHA256 均为 `0c6cd6655a011fa6ef452d340d53e195230827db9c28cd696ed2f5101faf36d1`。两者读取 `/var/lib/ave-mujica-tls/current`，通过版本目录及原子符号链接切换成套证书/私钥；DERP 使用新增 `cert.conf` drop-in，原身份、8443/3478 和客户端验证保留。私钥和目录权限见 [部署手册](DEPLOY.md#主域与通配符证书)。
+- `derper-acme-renew.service` 已改为主域与通配符续签，证书剩余不超过 30 天时更新；每次成功检查后运行共享部署脚本，验证材料并按版本更新 DERP/Nginx，再检查实际 TLS 证书。每日北京时间 02:00–03:00 的 timer 已启用，首次检查 `Result=success/ExecMainStatus=0`，DERP PID 在该次续签检查前后保持，未重复重启。
+- 本轮仅重建主页、切换时重启 DERP。原六个其他容器 ID 和后端 PID `1734009`、`NRestarts=0` 保持；DERP/续签 timer/Mihomo/Docker/后端/内存守护 active，CSBot 前端 200、后端路由探测 404，Steam 三项就绪 true，生产已跟踪文件干净。离线检查见 [DELIVERY_CHECK.md](DELIVERY_CHECK.md)。
+- 原 ACME 状态、证书、服务与配置备份位于 `/home/ubuntu/backups/shared-tls-20261013-zim5tl`，`certificate-state-before.tar.gz` 中 8 个文件逐一校验 SHA256 一致。旧单域证书和原部署脚本保留；临时检出目录在验收后移除。服务器 GitHub 直连再次中断，Git 操作通过仅监听回环的临时 SSH 通道沿用 Mac 的 7895 代理完成，通道随命令退出关闭，未修改全局代理配置。
+
 ## 2026-10-13 个人主页备案链接上线
 
 - 配置版本 `f839bab90ae95b854c119925d8019761fe69a0ed` 已推送 GitHub，并由生产 `pull --ff-only` 发布；仅修改 `assets/homepage/index.html`。主页页脚显示 `浙ICP备2026084445号`，链接到 `https://beian.miit.gov.cn/`，使用 `target="_blank"` 和 `rel="noopener noreferrer"`。
@@ -177,8 +186,10 @@
 
 ```mermaid
 flowchart LR
-    HomepageBrowser[浏览器 :80] --> Homepage[csbot-homepage :80]
+    HomepageBrowser[浏览器 :80 / :443] --> Homepage[csbot-homepage 静态主页]
     Homepage --> HomepageFiles[assets/homepage 本地静态文件]
+    SharedTLS[共享主域和通配符证书] --> Homepage
+    SharedTLS --> DERP[derper :8443]
     Browser[浏览器 :1234] --> Nginx[csbot-nginx :80]
     Nginx --> Static[dist / build-output]
     Nginx -->|/api/ → host.docker.internal:8888| Backend[csbot.service]
@@ -192,7 +203,9 @@ flowchart LR
 | --- | --- | --- | --- |
 | 后端 | systemd + uv | `0.0.0.0:8888` | `/home/ubuntu/csbot/.env.prod` |
 | Nginx | `nginx:alpine` | 所有地址 TCP 1234 → 容器 80 | `assets/default.conf`、`dist/`、`imgs/` |
-| 个人主页 Nginx（2026-10-02 新增） | `nginx:alpine` | 所有地址 TCP 80 → 容器 80 | `assets/homepage.conf`、`assets/homepage/`，只读挂载；本地静态文件 |
+| 个人主页 Nginx | `nginx:alpine` | 所有地址 TCP 80/443 → 容器 80/443 | `assets/homepage.conf`、`assets/homepage/`、`/var/lib/ave-mujica-tls`，只读挂载 |
+| DERP | `derper.service` | TCP 8443、UDP 3478 | `/var/lib/derper/identity.json`、共享证书目录 `current` |
+| 证书签发/续签 | lego + `derper-acme-issue/renew.service`、`derper-acme-renew.timer` | 阿里云 DNS-01，每日检查 | `/etc/derper-acme/`、`/var/lib/derper-acme/`、`/var/lib/ave-mujica-tls/` |
 | PostgreSQL | `postgres:15-alpine` | 所有地址 TCP 5432 | `pg_data/` |
 | Adminer | `adminer` | 所有地址 TCP 8081 → 容器 8080 | 无持久卷 |
 | NapCat | `mlikiowa/napcat-docker:latest` | 所有地址 TCP 6099 | `napcat/config/`、`ntqq/` |
@@ -228,7 +241,7 @@ flowchart LR
 3. CSBot Compose 项目：`/home/ubuntu/csbot/docker-compose.yml`
    - `csbot-database`：PostgreSQL，端口 5432。
    - `csbot-nginx`：前端静态文件和反向代理，端口 1234。前端没有单独运行时服务。
-   - `csbot-homepage`：个人主页静态文件，端口 80；文件位于 `assets/homepage/`。
+   - `csbot-homepage`：个人主页静态文件，端口 80/443；文件位于 `assets/homepage/`，启动前须准备共享证书。
    - `csbot-napcat`：QQ/NapCat，端口 6099。
    - `csbot-adminer-1`：Adminer，端口 8081。
 4. Steam Monitor Compose 项目：`/home/ubuntu/steam_monitor_js/compose.yaml`
@@ -282,6 +295,8 @@ sudo docker compose -f /home/ubuntu/ts/docker-compose.yml ps
 curl -fsS --max-time 5 http://127.0.0.1:5555/api/health
 curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
 curl -fsS --max-time 40 http://127.0.0.1/ -o /dev/null
+curl -fsS --resolve ave-mujica.top:443:127.0.0.1 --max-time 10 https://ave-mujica.top/ -o /dev/null
+systemctl is-active derper.service derper-acme-renew.timer
 journalctl -u mihomo.service -u csbot.service -n 100 --no-pager
 ```
 
@@ -296,6 +311,8 @@ Steam Monitor 应显示 `healthy`，其 `/api/health` 应包含 `loggedOn=true` 
 - `/home/ubuntu/csbot/dist` 和 `/home/ubuntu/csbot/assets/default.conf`
 - `/home/ubuntu/csbot/assets/homepage.conf`
 - `/home/ubuntu/csbot/assets/homepage/`
+- `/var/lib/ave-mujica-tls/`、`/var/lib/derper-acme/`、`/var/lib/derper/`
+- `/etc/derper-acme/`、DERP 主 unit 与新增证书 drop-in、签发和续签 unit/timer，以及既有 lego 和日志脱敏 wrapper
 - `/home/ubuntu/clashctl/resources`、`/home/ubuntu/clashctl/bin/mihomo` 和代理配置
 - `/home/ubuntu/steam_monitor_js/.env`、`/home/ubuntu/steam_monitor_js/data` 和 `compose.yaml`
 - `/home/ubuntu/ts/data` 和 `/home/ubuntu/ts/docker-compose.yml`
