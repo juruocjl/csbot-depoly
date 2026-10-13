@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-10-13 个人主页 HTTP 自动跳转 HTTPS
+
+- 配置版本 `d048fd241b0ae2e388621f5d0dc9bd6fcde6c40b` 经 GitHub 和生产 `pull --ff-only` 发布，仅修改 `assets/homepage.conf`。80 端口使用独立 server 块返回 308，目标固定为 `https://ave-mujica.top$request_uri`，保留路径和查询参数；443 继续直接提供原静态主页。
+- 无网络临时容器及上线容器 `nginx -t` 均通过。公网 IP、主域和自有 DERP 子域 Host 验证 308/Location 正确；服务器本地额外验证任意 Host 均使用固定主域。`/index.html?via=http&next=%2Fdocs` 保持编码和查询参数，curl 跟随跳转后 HTTPS 200，正文与提交的主页相同。
+- 仅重建主页容器，其他六个容器 ID、后端 PID `1734009` 和 DERP PID `1963917` 均保持，二者 `NRestarts=0`。相关 systemd 服务和续签 timer active，CSBot 前端 200、后端路由探测 404，Steam 三项就绪 true，生产已跟踪文件干净。没有重新签发证书或更新续签配置。
+- 原主页配置、commit 与运行快照保存在 `/home/ubuntu/backups/homepage-redirect-20261013-dP9MZv`。单文件配置 bind mount 经重建刷新；Git 拉取沿用仅监听回环的临时 SSH 代理通道，未修改全局代理。
+
 ## 2026-10-13 主域与通配符证书共用及个人主页 HTTPS 上线
 
 - 配置版本 `6028c4e8b417ab1b42f2242708c64b59c96f2b66` 已推送 GitHub。先在服务器独立检出目录经 `pull --ff-only` 安装签发任务，沿用已注册的 ACME 账户和现有阿里云 DNS 凭据；18:01 签发成功后再更新生产检出目录。证书由 Let's Encrypt YE2 签发，SAN 为 `ave-mujica.top`、`*.ave-mujica.top`，有效期至 2027-01-11；未新建账户或 DNS 凭据。
@@ -294,7 +301,7 @@ sudo docker compose -f /home/ubuntu/steam_monitor_js/compose.yaml ps
 sudo docker compose -f /home/ubuntu/ts/docker-compose.yml ps
 curl -fsS --max-time 5 http://127.0.0.1:5555/api/health
 curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
-curl -fsS --max-time 40 http://127.0.0.1/ -o /dev/null
+curl -fsSI --max-time 10 http://127.0.0.1/  # 应为308并跳转https://ave-mujica.top/
 curl -fsS --resolve ave-mujica.top:443:127.0.0.1 --max-time 10 https://ave-mujica.top/ -o /dev/null
 systemctl is-active derper.service derper-acme-renew.timer
 journalctl -u mihomo.service -u csbot.service -n 100 --no-pager

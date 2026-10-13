@@ -12,7 +12,7 @@
 | 前端 | `csbot-front/main` 经 GitHub Actions 生成 `build-output` | `/home/ubuntu/csbot/dist` 是独立 Git 仓库；由 `csbot-nginx` 提供静态文件 |
 | Steam Monitor | `steam_monitor_js/main` | `/home/ubuntu/steam_monitor_js`；Docker Compose 构建镜像 |
 | PostgreSQL / Nginx / NapCat / Adminer | `csbot/docker-compose.yml` | `/home/ubuntu/csbot` 的 Compose 项目 |
-| 个人主页入口 | `csbot/docker-compose.yml`、`csbot/assets/homepage.conf`、`csbot/assets/homepage/` | `csbot-homepage`，宿主机 80/443 端口直接提供本地静态主页 |
+| 个人主页入口 | `csbot/docker-compose.yml`、`csbot/assets/homepage.conf`、`csbot/assets/homepage/` | `csbot-homepage`，80 跳转 HTTPS，443 提供本地静态主页 |
 | 主域与通配符证书 | `csbot/deploy/systemd/derper-acme-*`、`csbot/scripts/ave_mujica_cert_deploy.py` | 既有 lego + 阿里云 DNS-01；个人主页与 DERP 共用证书 |
 | Mihomo / TeamSpeak | 服务器既有配置 | 见服务清单；TeamSpeak 未包含在三个子模块中 |
 
@@ -175,7 +175,7 @@ curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
 
 `csbot` Compose 的 `homepage` 服务使用独立 Nginx 容器 `csbot-homepage`，映射宿主机 `80:80` 和 `443:443`。配置源为 `csbot/assets/homepage.conf`，在生产只读挂载至 `/etc/nginx/conf.d/default.conf`；`csbot/assets/homepage/` 只读挂载至 `/usr/share/nginx/html/`，由 Nginx 直接提供本地文件。证书目录 `/var/lib/ave-mujica-tls` 只读挂载至 `/etc/nginx/tls`，HTTPS 使用 `current/fullchain.pem` 和 `current/privkey.pem`。原 CSBot 前端仍由 `csbot-nginx` 的 1234 端口提供。
 
-主页源自 `https://juruocjl.github.io/`，2026-10-02 下载并保存为 `csbot/assets/homepage/index.html`；当前页面的样式全部内联，无外部脚本或图片。访问时不请求 GitHub Pages，未知路径返回本地 404。此入口不需要 `csbot-front` 构建产物，域名入口为 `https://ave-mujica.top/`，原 `http://42.193.244.178/` 仍可用。证书覆盖主域和一级子域，不覆盖 IP 地址。
+主页源自 `https://juruocjl.github.io/`，2026-10-02 下载并保存为 `csbot/assets/homepage/index.html`；当前页面的样式全部内联，无外部脚本或图片。访问时不请求 GitHub Pages，HTTPS 未知路径返回本地 404。此入口不需要 `csbot-front` 构建产物，域名入口为 `https://ave-mujica.top/`。80 端口统一返回 308，跳转到 `https://ave-mujica.top$request_uri`，保留路径和查询参数；IP、主域或其他 Host 的 HTTP 访问均使用固定主域。证书覆盖主域和一级子域，不覆盖 IP 地址。
 
 主页页脚保留 `浙ICP备2026084445号`，链接到 `https://beian.miit.gov.cn/`。原站内容更新后，先下载到临时文件，比较并合并至 `csbot/assets/homepage/index.html`，保留本地备案页脚，再按 Git 发布流程更新服务器。在此 Mac 上沿用现有代理下载：
 
@@ -193,11 +193,11 @@ sudo -n docker compose config --quiet
 sudo -n docker compose run --rm --no-deps --pull never homepage nginx -t
 sudo -n docker compose up -d --no-deps --pull never --force-recreate homepage
 sudo -n docker exec csbot-homepage nginx -t
-curl -fsS --max-time 40 http://127.0.0.1/ -o /dev/null
+curl -fsSI --max-time 10 http://127.0.0.1/  # 应为308，Location为https://ave-mujica.top/
 curl -fsS --resolve ave-mujica.top:443:127.0.0.1 --max-time 10 https://ave-mujica.top/ -o /dev/null
 ```
 
-上述命令沿用服务器已安装的 `nginx:alpine` 镜像；首次恢复须先准备该镜像。配置文件被 Git 替换后，须重建 `homepage` 以刷新单文件 bind mount；仅更新静态目录内文件通常无需重建。仅操作 `homepage`，并执行本手册的业务验收；另从公网检查 80 端口 HTTP 200 和首页内容。2026-10-02 发布时公网已可达，无需调整主机防火墙或云安全组。
+上述命令沿用服务器已安装的 `nginx:alpine` 镜像；首次恢复须先准备该镜像。配置文件被 Git 替换后，须重建 `homepage` 以刷新单文件 bind mount；仅更新静态目录内文件通常无需重建。仅操作 `homepage`，并执行本手册的业务验收；另从公网检查 HTTP 308 的 Location、路径/查询参数保留、跟随跳转后 HTTPS 200 和首页内容。2026-10-02 发布时公网已可达，无需调整主机防火墙或云安全组。
 
 停用入口可执行 `sudo -n docker compose stop homepage`；配置回退通过 revert 提交及正常 Git 发布流程完成。此服务没有业务数据卷，不涉及数据库迁移。
 
@@ -231,7 +231,7 @@ sudo -n systemctl enable --now derper-acme-renew.timer
 sudo -n systemctl start derper-acme-renew.service
 ```
 
-验收包含主域 HTTPS 200、原 HTTP 200、备案页脚、DERP 8443 与主页 443 的实际证书一致、续签任务 success、timer enabled，以及原业务服务检查。公网访问须核对 DNS 和云安全组；证书签发成功本身不能证明 443 公网可达。
+验收包含主域 HTTPS 200、HTTP 308 跳转到固定 HTTPS 主域、备案页脚、DERP 8443 与主页 443 的实际证书一致、续签任务 success、timer enabled，以及原业务服务检查。公网访问须核对 DNS 和云安全组；证书签发成功本身不能证明 443 公网可达。
 
 回退时先停续签 timer；从私有备份恢复原续签 unit/timer，移除本次新增的 DERP `cert.conf` 并 daemon-reload，重启 DERP 以加载保留的旧目录。主页通过 revert 提交及 Git 流程恢复原配置。保留新旧证书和 ACME 状态，不删除凭据、身份或业务数据。新服务器还须从原机安全恢复现有 lego、日志脱敏 wrapper、账户和 DNS 凭据。
 
