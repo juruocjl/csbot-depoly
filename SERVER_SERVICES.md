@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-10-13 www 域名解析及主域跳转上线
+
+- 配置版本 `6d11282975ac4c9744f4374c13e96c6e478b1f10` 经 GitHub 和生产 `pull --ff-only` 发布，新增 www HTTPS server 块及固定域名 DNS 辅助脚本。`www.ave-mujica.top` 的 HTTP/HTTPS 均返回 308，目标为 `https://ave-mujica.top$request_uri`，保留路径、查询参数和编码；主域继续提供本地静态主页。
+- 使用既有阿里云凭据经 transient systemd service 检查 www 原记录为空，再新增默认线路的 CNAME `www → ave-mujica.top`，TTL 600 秒。`dns19.hichina.com`、`dns20.hichina.com` 均返回权威 NOERROR 和正确 CNAME；再次只读检查得到 `already_configured`，未重复新增。凭据通过 EnvironmentFile 继承，未出现在命令参数、日志或 Git 中。
+- 22:23（Asia/Shanghai）从本机公网正常 DNS 解析访问 HTTP www 与 HTTPS www，均返回正确 308/Location。`/index.html?via=www&next=%2Fdocs` 路径及编码保持；curl 跟随跳转后主域 HTTPS 200，正文与提交静态 HTML 一致。HTTPS www 通过现有通配符证书验证，无重新签发或续签变更。
+- 仅重建主页容器；其余六容器 ID、后端 PID `1734009` 和 DERP PID `1963917` 均保持，二者 `NRestarts=0`。相关服务和续签 timer active，CSBot 前端 200、后端路由探测 404，Steam 三项就绪 true，生产跟踪文件干净。原配置、版本、运行状态及 DNS 前后记录位于 `/home/ubuntu/backups/homepage-www-20261013-jiDUwV`。
+
 ## 2026-10-13 个人主页 HTTP 自动跳转 HTTPS
 
 - 配置版本 `d048fd241b0ae2e388621f5d0dc9bd6fcde6c40b` 经 GitHub 和生产 `pull --ff-only` 发布，仅修改 `assets/homepage.conf`。80 端口使用独立 server 块返回 308，目标固定为 `https://ave-mujica.top$request_uri`，保留路径和查询参数；443 继续直接提供原静态主页。

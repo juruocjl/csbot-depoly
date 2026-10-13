@@ -177,6 +177,10 @@ curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
 
 主页源自 `https://juruocjl.github.io/`，2026-10-02 下载并保存为 `csbot/assets/homepage/index.html`；当前页面的样式全部内联，无外部脚本或图片。访问时不请求 GitHub Pages，HTTPS 未知路径返回本地 404。此入口不需要 `csbot-front` 构建产物，域名入口为 `https://ave-mujica.top/`。80 端口统一返回 308，跳转到 `https://ave-mujica.top$request_uri`，保留路径和查询参数；IP、主域或其他 Host 的 HTTP 访问均使用固定主域。证书覆盖主域和一级子域，不覆盖 IP 地址。
 
+`www.ave-mujica.top` 使用 CNAME 指向 `ave-mujica.top`，默认解析线路、TTL 600 秒。HTTP 沿用统一跳转，HTTPS 使用单独的 `server_name www.ave-mujica.top` 块返回同一 308 目标。现有通配符证书覆盖 `www`，无需重新签发。
+
+DNS 恢复时先核对现有记录；`scripts/ensure_www_dns.py` 默认只读检查，`--apply --backup-dir <私有目录>` 仅在没有 `www` 记录时新增固定 CNAME。已有正确记录则跳过，冲突记录拒绝覆盖。通过 transient systemd service 的 `EnvironmentFile=/etc/derper-acme/aliyun.env` 沿用现有凭据，不把凭据放入参数或日志；脚本只输出记录状态及固定错误码，DNS 前后状态保存在私有目录。修改 DNS 后须检查权威解析和 HTTP/HTTPS 跳转，客户端可能暂时保留此前的负缓存。
+
 主页页脚保留 `浙ICP备2026084445号`，链接到 `https://beian.miit.gov.cn/`。原站内容更新后，先下载到临时文件，比较并合并至 `csbot/assets/homepage/index.html`，保留本地备案页脚，再按 Git 发布流程更新服务器。在此 Mac 上沿用现有代理下载：
 
 ```bash
@@ -195,6 +199,7 @@ sudo -n docker compose up -d --no-deps --pull never --force-recreate homepage
 sudo -n docker exec csbot-homepage nginx -t
 curl -fsSI --max-time 10 http://127.0.0.1/  # 应为308，Location为https://ave-mujica.top/
 curl -fsS --resolve ave-mujica.top:443:127.0.0.1 --max-time 10 https://ave-mujica.top/ -o /dev/null
+curl -fsSI --resolve www.ave-mujica.top:443:127.0.0.1 --max-time 10 https://www.ave-mujica.top/  # 应为308并跳转主域
 ```
 
 上述命令沿用服务器已安装的 `nginx:alpine` 镜像；首次恢复须先准备该镜像。配置文件被 Git 替换后，须重建 `homepage` 以刷新单文件 bind mount；仅更新静态目录内文件通常无需重建。仅操作 `homepage`，并执行本手册的业务验收；另从公网检查 HTTP 308 的 Location、路径/查询参数保留、跟随跳转后 HTTPS 200 和首页内容。2026-10-02 发布时公网已可达，无需调整主机防火墙或云安全组。

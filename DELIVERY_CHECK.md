@@ -1,5 +1,10 @@
 # 本地交付验收
 
+## 2026-10-13 www 域名跳转
+
+- Python DNS 辅助脚本语法检查、Nginx 隔离配置校验和上线校验通过。真实阿里云 API 只读确认原记录为空，新增固定 CNAME 后云端复验及再次只读检查通过；两台权威 DNS 均返回正确 CNAME。
+- 本机公网使用正常 DNS 解析验证 HTTP www 和 HTTPS www 均返回 308，固定主域、路径、查询参数与 `%2F` 编码保留；HTTPS 验证现有通配符证书，跟随跳转后 200 且主页 HTML 与提交逐字一致。原业务验收与备份见 SERVER_SERVICES.md。
+
 ## 2026-10-13 个人主页 HTTP 跳转
 
 - 新 Nginx 配置在无网络临时容器和上线容器中校验通过。公网 IP、主域及自有子域 Host 返回 308，Location 固定为 HTTPS 主域；服务器本地任意 Host 同样跳转。路径、查询参数及 `%2F` 编码保留，curl 跟随跳转后 HTTPS 200，返回 HTML 与提交内容逐字一致。业务服务状态及原版本备份见 SERVER_SERVICES.md。
