@@ -176,10 +176,10 @@ curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
 
 主页源自 `https://juruocjl.github.io/`，2026-10-02 下载并保存为 `csbot/assets/homepage/index.html`；当前页面的样式全部内联，无外部脚本或图片。访问时不请求 GitHub Pages，未知路径返回本地 404。此入口不需要 `csbot-front` 构建产物，访问地址为 `http://42.193.244.178/`。
 
-原站内容更新后，先在本地同步 HTML 和需要的静态资源，再按 Git 发布流程更新服务器。当前单文件页面可在父仓库根目录下载：
+主页页脚保留 `浙ICP备2026084445号`，链接到 `https://beian.miit.gov.cn/`。原站内容更新后，先下载到临时文件，比较并合并至 `csbot/assets/homepage/index.html`，保留本地备案页脚，再按 Git 发布流程更新服务器。在此 Mac 上沿用现有代理下载：
 
 ```bash
-curl -fsS --connect-timeout 10 --max-time 30 https://juruocjl.github.io/ -o csbot/assets/homepage/index.html
+curl --proxy socks5h://127.0.0.1:7895 -fsS --connect-timeout 5 --max-time 30 https://juruocjl.github.io/ -o /tmp/csbot-homepage-origin.html
 ```
 
 先按本手册完成本地检查、提交推送、线上已跟踪文件与分支检查，再在服务器执行：

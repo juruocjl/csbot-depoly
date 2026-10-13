@@ -1,5 +1,11 @@
 # CSBot 服务器服务清单
 
+## 2026-10-13 个人主页备案链接上线
+
+- 配置版本 `f839bab90ae95b854c119925d8019761fe69a0ed` 已推送 GitHub，并由生产 `pull --ff-only` 发布；仅修改 `assets/homepage/index.html`。主页页脚显示 `浙ICP备2026084445号`，链接到 `https://beian.miit.gov.cn/`，使用 `target="_blank"` 和 `rel="noopener noreferrer"`。
+- 公网 HTTP 200，返回 HTML 与本地提交逐字一致，浏览器实际显示备案链接；继续直接读取本地静态文件。原七个容器 ID 以及后端 PID `1734009`、`NRestarts=0` 保持；Mihomo、Docker、后端、内存守护 timer active，CSBot 前端 HTTP 200、后端路由探测 404，Steam `ok/loggedOn/friendStatusReady` 均 true，生产跟踪文件干净。无服务重启、构建或数据变更。
+- 原主页、commit 与运行快照保存在 `/home/ubuntu/backups/homepage-icp-20261013-vaz0rL`。服务器既有代理访问 GitHub 发生 TLS 中断/超时，确认直连 HTTP 200 后，仅本次 Git 命令使用空 `http.proxy/https.proxy` 完成拉取，未修改全局代理配置。后续同步原站须保留本地备案页脚，见 [部署手册](DEPLOY.md#80-端口个人主页)。
+
 ## 2026-10-07 AI管理员仅使用机器人自维护状态发布
 
 - 用户授权“部署”后，08:56（Asia/Shanghai）生产后端经 GitHub `pull --ff-only` 从 `13103fd6dd76cb09d193b153d3ac24d9375cddb1` 更新为 `5c3c931544641b6d0b881f948a026dca6caa6615`。管理员查询只读机器人 `adminqq/adminqqalive`，成员查询不保存/返回QQ角色；工具目录、SQL状态描述、系统提示和DATA.md已同步口径。前端产物仍为 `46631aa299731c0f09c34a83ec0b755f085ddc4e`，无业务权限、依赖、镜像或数据库结构变更。
