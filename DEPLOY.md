@@ -9,10 +9,10 @@
 | 组件 | 发布来源 | 生产位置与运行方式 |
 | --- | --- | --- |
 | 后端 | `csbot` 的 `main` | `/home/ubuntu/csbot`；`csbot.service` |
-| 前端 | `csbot-front/main` 经 GitHub Actions 生成 `build-output` | `/home/ubuntu/csbot/dist` 是独立 Git 仓库；由 `csbot-nginx` 提供静态文件 |
+| 前端 | `csbot-front/main` 经 GitHub Actions 生成 `build-output` | `/home/ubuntu/csbot/dist` 是独立 Git 仓库；`https://cs.ave-mujica.top/`，原 `csbot-nginx` 1234 入口保留 |
 | Steam Monitor | `steam_monitor_js/main` | `/home/ubuntu/steam_monitor_js`；Docker Compose 构建镜像 |
 | PostgreSQL / Nginx / NapCat / Adminer | `csbot/docker-compose.yml` | `/home/ubuntu/csbot` 的 Compose 项目 |
-| 个人主页入口 | `csbot/docker-compose.yml`、`csbot/assets/homepage.conf`、`csbot/assets/homepage/` | `csbot-homepage`，80 跳转 HTTPS，443 提供本地静态主页 |
+| HTTPS 入口 | `csbot/docker-compose.yml`、`csbot/assets/homepage.conf` | `csbot-homepage`，80 跳转 HTTPS，443 按域名提供个人主页或 dashboard |
 | 主域与通配符证书 | `csbot/deploy/systemd/derper-acme-*`、`csbot/scripts/ave_mujica_cert_deploy.py` | 既有 lego + 阿里云 DNS-01；个人主页与 DERP 共用证书 |
 | Mihomo / TeamSpeak | 服务器既有配置 | 见服务清单；TeamSpeak 未包含在三个子模块中 |
 
@@ -175,11 +175,11 @@ curl -fsS --max-time 10 http://127.0.0.1:1234/ai-chat -o /dev/null
 
 `csbot` Compose 的 `homepage` 服务使用独立 Nginx 容器 `csbot-homepage`，映射宿主机 `80:80` 和 `443:443`。配置源为 `csbot/assets/homepage.conf`，在生产只读挂载至 `/etc/nginx/conf.d/default.conf`；`csbot/assets/homepage/` 只读挂载至 `/usr/share/nginx/html/`，由 Nginx 直接提供本地文件。证书目录 `/var/lib/ave-mujica-tls` 只读挂载至 `/etc/nginx/tls`，HTTPS 使用 `current/fullchain.pem` 和 `current/privkey.pem`。原 CSBot 前端仍由 `csbot-nginx` 的 1234 端口提供。
 
-主页源自 `https://juruocjl.github.io/`，2026-10-02 下载并保存为 `csbot/assets/homepage/index.html`；当前页面的样式全部内联，无外部脚本或图片。访问时不请求 GitHub Pages，HTTPS 未知路径返回本地 404。此入口不需要 `csbot-front` 构建产物，域名入口为 `https://ave-mujica.top/`。80 端口统一返回 308，跳转到 `https://ave-mujica.top$request_uri`，保留路径和查询参数；IP、主域或其他 Host 的 HTTP 访问均使用固定主域。证书覆盖主域和一级子域，不覆盖 IP 地址。
+主页源自 `https://juruocjl.github.io/`，2026-10-02 下载并保存为 `csbot/assets/homepage/index.html`；当前页面的样式全部内联，无外部脚本或图片。访问时不请求 GitHub Pages，主域 HTTPS 未知路径返回本地 404。个人主页不需要 `csbot-front` 构建产物，域名入口为 `https://ave-mujica.top/`。80 端口返回 308，默认跳转到 `https://ave-mujica.top$request_uri`，保留路径和查询参数；IP、主域或其他 Host 的 HTTP 访问均使用固定主域。`cs.ave-mujica.top` 单独跳转到同名 HTTPS dashboard。证书覆盖主域和一级子域，不覆盖 IP 地址。
 
 `www.ave-mujica.top` 使用 CNAME 指向 `ave-mujica.top`，默认解析线路、TTL 600 秒。HTTP 沿用统一跳转，HTTPS 使用单独的 `server_name www.ave-mujica.top` 块返回同一 308 目标。现有通配符证书覆盖 `www`，无需重新签发。
 
-DNS 恢复时先核对现有记录；`scripts/ensure_www_dns.py` 默认只读检查，`--apply --backup-dir <私有目录>` 仅在没有 `www` 记录时新增固定 CNAME。已有正确记录则跳过，冲突记录拒绝覆盖。通过 transient systemd service 的 `EnvironmentFile=/etc/derper-acme/aliyun.env` 沿用现有凭据，不把凭据放入参数或日志；脚本只输出记录状态及固定错误码，DNS 前后状态保存在私有目录。修改 DNS 后须检查权威解析和 HTTP/HTTPS 跳转，客户端可能暂时保留此前的负缓存。
+DNS 恢复时先核对现有记录；`scripts/ensure_www_dns.py` 默认只读检查 `www`，`--label cs` 检查 dashboard 子域。加上 `--apply --backup-dir <私有目录>` 仅在所选标签没有记录时新增指向固定主域的 CNAME。已有正确记录则跳过，冲突记录拒绝覆盖；标签仅允许 `www`、`cs`。通过 transient systemd service 的 `EnvironmentFile=/etc/derper-acme/aliyun.env` 沿用现有凭据，不把凭据放入参数或日志；脚本只输出记录状态及固定错误码，DNS 前后状态保存在私有目录。修改 DNS 后须检查权威解析和 HTTP/HTTPS 跳转，客户端可能暂时保留此前的负缓存。
 
 主页页脚保留 `浙ICP备2026084445号`，链接到 `https://beian.miit.gov.cn/`。原站内容更新后，先下载到临时文件，比较并合并至 `csbot/assets/homepage/index.html`，保留本地备案页脚，再按 Git 发布流程更新服务器。在此 Mac 上沿用现有代理下载：
 
@@ -205,6 +205,14 @@ curl -fsSI --resolve www.ave-mujica.top:443:127.0.0.1 --max-time 10 https://www.
 上述命令沿用服务器已安装的 `nginx:alpine` 镜像；首次恢复须先准备该镜像。配置文件被 Git 替换后，须重建 `homepage` 以刷新单文件 bind mount；仅更新静态目录内文件通常无需重建。仅操作 `homepage`，并执行本手册的业务验收；另从公网检查 HTTP 308 的 Location、路径/查询参数保留、跟随跳转后 HTTPS 200 和首页内容。2026-10-02 发布时公网已可达，无需调整主机防火墙或云安全组。
 
 停用入口可执行 `sudo -n docker compose stop homepage`；配置回退通过 revert 提交及正常 Git 发布流程完成。此服务没有业务数据卷，不涉及数据库迁移。
+
+## Dashboard HTTPS 与网址设置
+
+`cs.ave-mujica.top` 的默认线路 CNAME 指向 `ave-mujica.top`，TTL 600 秒；使用现有主域/通配符证书。`homepage` 的同名 HTTPS server 直接读取只读挂载的 `dist/`（容器内 `/usr/share/nginx/dashboard/`）和 `imgs/`，SPA 路由回退至 `index.html`。`/api/` 直接代理到宿主机 `8888`，传递认证请求头；关闭代理缓冲、读取超时 660 秒，以支持 AI SSE 事件流。该入口与原 1234 端口读取同一构建产物，不增加页面上游请求或新的前端构建流程。
+
+生产 `/home/ubuntu/csbot/.env.prod` 设置 `CS_DOMAIN="https://cs.ave-mujica.top"`，末尾不带斜杠。该值由分享、AI 对话、日报和周报模块启动时读取，不属于 `/admin/config` 的数据库动态配置。调整时先私有备份环境文件，确认 AI 排队/运行任务及 pending/sent 发件箱均为 0，暂停内存守护 timer，停止后端并用 SQLite backup API 备份 AI 状态；只替换该变量，保留其他环境行及原文件属主/权限，再通过 `csbot.service` 启动前置检查恢复后端和 timer。凭据和环境文件不入库。新服务器恢复须同时准备 `dist/`、`imgs/`、共享证书和 DNS。
+
+验收使用正常公网 DNS：HTTP `cs` 应返回 308 至同名 HTTPS，保留路径与查询参数；HTTPS 首页、登录页和 AI 路由应返回 dashboard，JS/CSS 应是实际资源。用既有令牌只读验证 `/api/auth/verify`、历史对话及 SSE，匿名请求应被拒绝；确认主域个人主页及 www 跳转仍正常。更新 `dist` 的流程仍遵守 GitHub Actions 构建与 `build-output` 发布规则。
 
 ## 主域与通配符证书
 

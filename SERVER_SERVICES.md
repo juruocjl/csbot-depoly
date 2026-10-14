@@ -1,5 +1,13 @@
 # CSBot 服务器服务清单
 
+## 2026-10-14 Dashboard 子域 HTTPS 与网址设置上线
+
+- 配置版本 `ff65f92f160519fe96dcfdaa3029b11c2906fe5b` 经 GitHub 和生产 `pull --ff-only` 发布。`cs.ave-mujica.top` 新增默认线路 CNAME 指向主域，TTL 600；两台阿里云权威 DNS 均返回正确记录。原 www 记录经只读复验保持。
+- `https://cs.ave-mujica.top/` 由 `csbot-homepage` 直接提供现有 `dist/` 和 `imgs/`，API 直达宿主机 8888，保留 SSE 无缓冲和 660 秒读取超时。HTTP cs 返回 308 至同名 HTTPS，路径、查询参数及 `%2F` 编码保持；主域个人主页和 www 固定跳转保持。通配符证书已覆盖 cs，无重新签发，443 与 DERP 8443 实测叶证书指纹相同。
+- 生产 `.env.prod` 的 `CS_DOMAIN` 从 `http://42.193.244.178:1234` 改为 `https://cs.ave-mujica.top`；其他环境行、属主及权限保持。在无运行/排队 AI 和 pending/sent 发件箱时暂停守护、停止后端、备份状态并启动服务；按生产 dotenv 配置加载验证分享、AI、报表三模块均读取新值。后续生成的分享、AI、日报和周报链接使用此地址。
+- 15:34（Asia/Shanghai）公网正常 DNS 下 dashboard HTML 与旧 1234 入口逐字一致，登录/设置/AI SPA 路由和真实 JS/CSS 均 200。现有令牌验证成功、匿名请求 403；只读历史 SSE 返回 ready 事件、记忆入口 200。前端产物仍为 `46631aa299731c0f09c34a83ec0b755f085ddc4e`，未重新构建；没有发送验收消息或调用模型。
+- 仅重建主页容器，其余六容器 ID 保持。后端 MainPID `2339860`、DERP MainPID `1963917`，二者 `NRestarts=0`；相关服务与 timer active，OneBot 已连接，启动无 Traceback，Steam 三项就绪 true、reconnectStopped=false，生产跟踪文件干净。原配置、环境文件、运行版本/状态及 DNS 前后记录保存于 `/home/ubuntu/backups/dashboard-domain-20261014-16izDz`；`state-before.sqlite3` 的 integrity_check=ok，备份后可用约 4927 MiB。
+
 ## 2026-10-13 www 域名解析及主域跳转上线
 
 - 配置版本 `6d11282975ac4c9744f4374c13e96c6e478b1f10` 经 GitHub 和生产 `pull --ff-only` 发布，新增 www HTTPS server 块及固定域名 DNS 辅助脚本。`www.ave-mujica.top` 的 HTTP/HTTPS 均返回 308，目标为 `https://ave-mujica.top$request_uri`，保留路径、查询参数和编码；主域继续提供本地静态主页。
@@ -200,8 +208,12 @@
 
 ```mermaid
 flowchart LR
-    HomepageBrowser[浏览器 :80 / :443] --> Homepage[csbot-homepage 静态主页]
+    HomepageBrowser[ave-mujica.top / www :80 / :443] --> Homepage[csbot-homepage 域名入口]
     Homepage --> HomepageFiles[assets/homepage 本地静态文件]
+    DashboardBrowser[cs.ave-mujica.top :80 / :443] --> Homepage
+    Homepage -->|cs 静态资源| Static[dist / build-output]
+    Homepage -->|cs /api/ → host.docker.internal:8888| Backend[csbot.service]
+    Homepage -->|cs /imgs/| Images[imgs 目录]
     SharedTLS[共享主域和通配符证书] --> Homepage
     SharedTLS --> DERP[derper :8443]
     Browser[浏览器 :1234] --> Nginx[csbot-nginx :80]
@@ -217,7 +229,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | 后端 | systemd + uv | `0.0.0.0:8888` | `/home/ubuntu/csbot/.env.prod` |
 | Nginx | `nginx:alpine` | 所有地址 TCP 1234 → 容器 80 | `assets/default.conf`、`dist/`、`imgs/` |
-| 个人主页 Nginx | `nginx:alpine` | 所有地址 TCP 80/443 → 容器 80/443 | `assets/homepage.conf`、`assets/homepage/`、`/var/lib/ave-mujica-tls`，只读挂载 |
+| HTTPS 域名入口 Nginx | `nginx:alpine` | 所有地址 TCP 80/443 → 容器 80/443 | `assets/homepage.conf`、`assets/homepage/`、`dist/`、`imgs/`、`/var/lib/ave-mujica-tls`，只读挂载 |
 | DERP | `derper.service` | TCP 8443、UDP 3478 | `/var/lib/derper/identity.json`、共享证书目录 `current` |
 | 证书签发/续签 | lego + `derper-acme-issue/renew.service`、`derper-acme-renew.timer` | 阿里云 DNS-01，每日检查 | `/etc/derper-acme/`、`/var/lib/derper-acme/`、`/var/lib/ave-mujica-tls/` |
 | PostgreSQL | `postgres:15-alpine` | 所有地址 TCP 5432 | `pg_data/` |
@@ -255,7 +267,7 @@ flowchart LR
 3. CSBot Compose 项目：`/home/ubuntu/csbot/docker-compose.yml`
    - `csbot-database`：PostgreSQL，端口 5432。
    - `csbot-nginx`：前端静态文件和反向代理，端口 1234。前端没有单独运行时服务。
-   - `csbot-homepage`：个人主页静态文件，端口 80/443；文件位于 `assets/homepage/`，启动前须准备共享证书。
+   - `csbot-homepage`：个人主页与 `cs.ave-mujica.top` dashboard，端口 80/443；分别读取 `assets/homepage/` 和 `dist/`，启动前须准备共享证书。dashboard `/api/` 直达后端，`/imgs/` 读取图片目录。
    - `csbot-napcat`：QQ/NapCat，端口 6099。
    - `csbot-adminer-1`：Adminer，端口 8081。
 4. Steam Monitor Compose 项目：`/home/ubuntu/steam_monitor_js/compose.yaml`

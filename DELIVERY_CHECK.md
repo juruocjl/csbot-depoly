@@ -1,5 +1,11 @@
 # 本地交付验收
 
+## 2026-10-14 Dashboard 子域 HTTPS 与网址设置
+
+- Python DNS 脚本语法、Compose 配置、Git 差异检查，以及隔离容器和上线容器的 Nginx 配置检查通过。DNS API 先只读确认 cs 无记录，再新增固定 CNAME；两台权威 DNS 均复验通过，www 原记录保持。
+- 公网正常 DNS 验证 HTTP cs 308 和 HTTPS 200；路径、查询参数及编码保留。dashboard HTML 与旧入口一致，登录、设置和 AI 路由返回同一 SPA，真实 JS/CSS 类型与响应通过。既有令牌验证成功、匿名 403，历史 AI SSE ready 事件和只读记忆接口正常；不生成令牌、不调用模型或发送 QQ 消息。
+- `CS_DOMAIN` 单项替换后，通过生产 dotenv 配置加载验证三个模块的新值；后台 systemd 启动前置检查通过，OneBot、Steam、原容器和共用证书验证通过。环境和状态备份、版本及运行记录见 [服务清单](SERVER_SERVICES.md#2026-10-14-dashboard-子域-https-与网址设置上线)。
+
 ## 2026-10-13 www 域名跳转
 
 - Python DNS 辅助脚本语法检查、Nginx 隔离配置校验和上线校验通过。真实阿里云 API 只读确认原记录为空，新增固定 CNAME 后云端复验及再次只读检查通过；两台权威 DNS 均返回正确 CNAME。
