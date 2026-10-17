@@ -1,5 +1,12 @@
 # 本地交付验收
 
+## 2026-10-17 独立管理员 QQ 健康告警
+
+- 后端 `f1000bb9903e85149eb1f278090b45578405adab` 新增标准库监控脚本、独立 systemd service/timer 与 10 项测试。两端测试覆盖磁盘/内存/inode 阈值、连续采样与冷却、严重升级、瞬态抑制、恢复、通道故障期间异常留存、按收件人重试、长通知分批确认、OneBot message_id 确认、dry-run 无发送及私有原子状态保存。本地语法和 Git 差异检查通过。
+- 生产经 GitHub 和精确 `pull --ff-only` 发布；Linux 单元测试和 systemd 模板校验通过（仅既有 tat_agent PIDFile 的 /var/run 提示）。root 身份 dry-run 实际检查根盘/内存、systemd、容器、PostgreSQL、后端 HTTP、Steam、QQ 在线和只读 outbox，只报告本次真实的归档积压；不生成测试令牌、不运行生产数据夹具。
+- 服务使用 root 私有单一收件配置、现有 NapCat 认证和回环 Debug/call，无新增监听或后端重启。告警状态与锁位于 /run tmpfs；阈值和限制见 DEPLOY.md，磁盘事故及具体运行结果见 SERVER_SERVICES.md。
+- 16:16:28 第二次自然定时采样发送当前真实的归档积压通知；脚本验证 OneBot retcode=0、status=ok 及 message_id 后记录 `notification_delivered`。service Result=success、ExecMainStatus=0，timer 已排定下一次执行。此项证明平台确认发送，不代替用户阅读回执；没有发送合成故障测试消息或向其他管理员/群聊发送。
+
 ## 2026-10-14 Dashboard 子域 HTTPS 与网址设置
 
 - Python DNS 脚本语法、Compose 配置、Git 差异检查，以及隔离容器和上线容器的 Nginx 配置检查通过。DNS API 先只读确认 cs 无记录，再新增固定 CNAME；两台权威 DNS 均复验通过，www 原记录保持。

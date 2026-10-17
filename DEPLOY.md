@@ -153,6 +153,45 @@ sudo -n journalctl -u csbot-memory-guard.service -n 30 --no-pager
 
 停用主动重启：`sudo systemctl disable --now csbot-memory-guard.timer`，并等待已启动的 guard 任务完成；这不会移除后端硬上限。需要完全回退时，另删除本节安装的 `/etc/systemd/system/csbot.service.d/memory.conf`，执行 `sudo systemctl daemon-reload`，在已授权维护窗口重启后端，再核对 `MemoryMax`。不要删除其他 drop-in 或生产数据。
 
+## 独立 QQ 健康告警
+
+后端仓库的 `scripts/health_alert.py` 与 `deploy/systemd/csbot-health-alert.{service,timer}` 每分钟检查一次服务器。它使用系统 Python 标准库，不加载机器人、不依赖业务数据库取得收件人，通过 NapCat 4.18.30 现有 WebUI 的认证 `/api/Debug/call` 直接调用 `send_private_msg`。仅使用回环 6099，不新增 OneBot 监听端口或改动 NapCat 配置，也不重启业务服务。
+
+收件人必须在服务器私有文件 `/etc/csbot-health-alert.json` 中显式设置，例如 `{"recipients":["管理员QQ数字字符串"]}`，属主 root、权限 0600。不会自动扩展到 `SUPERUSERS`、群管理员或群聊。凭据只从既有 `napcat/config/webui.json` 读取，不写入命令行、告警或日志；HTTP 不使用系统代理。
+
+| 检查 | 预警 | 严重 |
+| --- | --- | --- |
+| 根分区 | 使用率 ≥90% 或可用 <2 GiB | 使用率 ≥97% 或可用 <800 MiB |
+| 根分区 inode | 剩余 ≤2% | 剩余 ≤1% |
+| 整机 MemAvailable | ≤512 MiB | ≤256 MiB |
+| 后端 cgroup 内存 | ≥1400 MiB | ≥1600 MiB |
+| app.log / err.log 单文件 | ≥100 MiB | ≥500 MiB |
+| 两个日志合计增速 | ≥5 MiB/分钟 | — |
+| 已发消息归档积压 | 最老 ≥30 分钟 | 最老 ≥2 小时 |
+| Steam 就绪 | 连续 3 次未就绪 | API 检查失败 |
+
+另外检查 csbot、Mihomo、Docker、内存守护 timer，数据库/NapCat/Steam/两处 Nginx 容器、PostgreSQL 接收连接、后端 HTTP 响应、QQ 在线状态，以及一次采样间隔内至少两次的后端自动重启。HTTP 路由响应只代表事件循环可响应，不代替数据库或业务功能验收。归档仅只读统计，不重发群消息或修改 outbox。
+
+通常连续两次异常才通知；严重资源压力与超大日志立即通知。预警每 6 小时、严重每小时提醒一次，升级立即通知；连续两次正常发送一次恢复通知。发送失败至少间隔 5 分钟重试，按收件人记录成功状态；QQ 不可用期间已确认的异常即使随后恢复，也保留到能发出补报。状态、锁和冷却写在 `/run/csbot-health-alert/` 的 tmpfs，根盘满时仍可工作；重启整机会清空状态。不会自动清理磁盘或重启服务。
+
+先运行 `python3 checks/health_alert_test.py`。按 Git 发布流程提交、推送并在服务器 `pull --ff-only` 后，准备好私有收件配置，再安装：
+
+```bash
+cd /home/ubuntu/csbot
+sudo -n python3 scripts/health_alert.py --dry-run
+sudo -n install -m 0644 scripts/health_alert.py /usr/local/lib/csbot-health-alert.py
+sudo -n install -m 0644 deploy/systemd/csbot-health-alert.service /etc/systemd/system/
+sudo -n install -m 0644 deploy/systemd/csbot-health-alert.timer /etc/systemd/system/
+sudo -n systemd-analyze verify /etc/systemd/system/csbot-health-alert.service /etc/systemd/system/csbot-health-alert.timer
+sudo -n systemctl daemon-reload
+sudo -n systemctl enable --now csbot-health-alert.timer
+sudo -n systemctl start csbot-health-alert.service
+systemctl list-timers csbot-health-alert.timer --no-pager
+sudo -n journalctl -u csbot-health-alert.service -n 10 --no-pager
+```
+
+`--dry-run` 只检查，不发送消息或写状态。真实验收须查看 `notification_delivered`（平台确认 message_id）及收件情况，不能把配置存在或 dry-run 成功当作通知已送达。停用使用 `sudo systemctl disable --now csbot-health-alert.timer`，必要时等待正在运行的 oneshot 完成；不会影响内存守护。告警依赖主机和 NapCat/QQ 通道，整机掉电、断网或 QQ 故障期间无法即时送达；需要外部独立通道才能覆盖这些情况。NapCat 升级时须复核 WebUI 认证与 Debug/call 返回结构。
+
 ## 前端发布
 
 1. 在 `csbot-front` 提交并推送 `main`。

@@ -1,5 +1,14 @@
 # CSBot 服务器服务清单
 
+## 2026-10-17 磁盘满导致群指令无响应与独立健康告警
+
+- 16:01（Asia/Shanghai）根分区可用空间为 0；csbot、NapCat、Mihomo、Docker 进程仍运行。PostgreSQL 反复在恢复检查点写 `pg_logical/replorigin_checkpoint.tmp` 时触发 `No space left on device`，拒绝连接；后端事件预处理和归档随之失败。NapCat 容器运行不能代表这条业务链路正常。
+- 用户授权紧急清理后，16:04 原位清空 `app.log`（2,312,523,776 字节）和 `err.log`（2,289,713,152 字节），保留活动文件 inode，使运行中日志句柄继续有效，实际可用空间恢复约 4.2 GiB。只保留文件元信息和固定错误类型计数；原始日志下载被自动审批拒绝，未复制群消息或凭据。未删除数据库、QQ 会话、图片、备份或回滚镜像，未重启业务服务。16:04:09 PostgreSQL 自动恢复接收连接，用户随后确认群指令恢复回复。
+- 直接增长源为 2026-10-16 18:44:30 的一条已发送但未完成索引的 outbox 记录，payload 仅 277 字节。`allmsg/outgoing.py` 每 30 秒重试；`chat_history.update_group_lexicon(replace=False)` 将所有候选词一次展开到 `term.in_(selected_terms)`，实测 54,843 个绑定参数，超过 asyncpg 的 32,767 上限。SQL 文本本身约 921,523 字节，每次异常接近 1 MiB，同时写入两个文件。`bot.py` 仅按一周轮转、没有大小上限和历史保留上限，最终形成约 4.29 GiB 的双份日志。此次没有修改词库查询或将这条记录标记成功，归档重试故障仍须修复。
+- 以 root 遍历并按 inode 去重、无遍历错误的归属统计：历史备份独占 **9,902,686,208 字节（约 9.22 GiB）**；线上与备份共享 **544,743,424 字节（约 0.51 GiB）**；清理后线上独占约 **6.61 GiB**。线上主要为 PostgreSQL 约 2.08 GiB、图片目录约 2.07 GiB、QQ 会话约 0.87 GiB。Docker 数据另约 5 GiB。2026-10-07 的失败备份 `ai-bot-admin-20261007-r9fhJp` 和已校验备份 `ai-bot-admin-20261007-M3DPpZ` 各约 2.73/2.86 GiB，均保留；未把未校验的两份内容直接视为完全相同或擅自删除。
+- 独立健康告警提交 `f1000bb9903e85149eb1f278090b45578405adab` 经 GitHub、生产精确 `pull --ff-only` 发布。收件人仅为用户明确指定的一个 QQ，保存在 root:root、0600 的 `/etc/csbot-health-alert.json`，不扩展到其他 SUPERUSERS。复用既有 NapCat WebUI 回环接口，独立于后端；没有新增端口或重启 NapCat。
+- 本地和 Linux 的 10 项策略/发送确认测试通过，线上 dry-run 只报告真实的归档积压，其他资源和服务探测通过。`csbot-health-alert.timer` 已启用，每分钟检查；16:16:28 第二次自然采样向指定 QQ 发送实际归档积压告警，OneBot 返回成功与 message_id，journal 记录 `notification_delivered`。后端 MainPID 仍为 `3440224`、NRestarts=0，七个容器持续运行，磁盘可用约 4.2 GiB。阈值、冷却、恢复通知和通道限制见 [部署手册](DEPLOY.md#独立-qq-健康告警)。监控只通知，不清理数据或自动重启服务。
+
 ## 2026-10-14 Dashboard 子域 HTTPS 与网址设置上线
 
 - 配置版本 `ff65f92f160519fe96dcfdaa3029b11c2906fe5b` 经 GitHub 和生产 `pull --ff-only` 发布。`cs.ave-mujica.top` 新增默认线路 CNAME 指向主域，TTL 600；两台阿里云权威 DNS 均返回正确记录。原 www 记录经只读复验保持。
