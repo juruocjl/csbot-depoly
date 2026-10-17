@@ -1,5 +1,44 @@
 # CSBot 服务器服务清单
 
+## 2026-10-17 历史备份及闲置副本删除、数据库只读空间排查
+
+**当前恢复材料状态：用户明确要求“删除所有备份，只保留一套生产目录”后，`/home/ubuntu/backups/` 已清空。本文其他历史章节记录的该目录下备份路径均已删除，不能再作为现存恢复材料使用。**
+
+- 删除前确认备份目录不是符号链接、不含挂载，也不被生产服务或容器使用；按 inode 区分独占与共享文件。清空 35 个顶层备份目录及 4 个顶层文件，根盘可用空间净增 10,021,933,056 字节。随后删除生产目录中 22 个已核实未跟踪的旧环境/动态配置备份文件及约 64 MiB 的旧 Git 备份目录，保留当前 `.env`、`.env.prod`。
+- 按只保留生产目录的要求，进一步核实并删除四个无进程/容器/挂载依赖的旧副本：`csbot-watchstage-test`、`csbot-ai-validation`、`csbot_chat_history_test`、旧 `steam_monitor`。合计独占约 698 MiB，实测可用空间再增加 731,840,512 字节；共享依赖硬链接没有重复计入释放量。当前生产后端 `/home/ubuntu/csbot`、其中前端 `dist`、`/home/ubuntu/steam_monitor_js` 及其运行数据保留。
+- 16:31（Asia/Shanghai）可用空间 **15,205,670,912 字节，约 14.16 GiB**，根分区使用率 **63%**。后端 PID 仍 `3440224`、NRestarts=0，七个容器持续运行，PostgreSQL 接收连接、前端 HTTP 200；独立健康监控 dry-run 的 QQ、Steam、资源和服务检查通过，只剩此前的归档积压故障。此次没有重启业务服务或修改生产数据库。
+
+剩余主要占用（目录大小包含有效数据，不能直接等同于可清理空间）：
+
+| 目录/类别 | 约占用 | 内容 |
+| --- | --- | --- |
+| `/var/lib/docker` | 4.99 GiB | 镜像层、容器与构建缓存；保留运行和 AI 沙箱所需镜像 |
+| `/usr` | 4.47 GiB | 操作系统及已安装程序 |
+| `csbot/imgs` | 2.58 GiB | 历史图片约 1.22 GiB、头像约 0.95 GiB，以及图库等 |
+| `csbot/pg_data` | 2.08 GiB | 生产库、测试库、WAL 与系统库 |
+| `mc_server` | 1.65 GiB | 另一项 Minecraft 服务目录，本次不清理 |
+| `/var/log` | 1.01 GiB | journal 与 syslog 等系统日志 |
+| `csbot/ntqq` | 0.87 GiB | 当前 QQ 会话和运行数据 |
+| `/home/ubuntu/.cache` | 0.85 GiB | 主要是 uv 缓存，部分文件与运行环境共享硬链接 |
+
+数据库仅执行只读事务，限制 statement_timeout=8s、lock_timeout=1s、work_mem=4MiB，未删表/删行、VACUUM、REINDEX 或安装扩展。生产库 `csbot` 约 **1.41 GiB**；`csbot_backup` 约 **575 MiB**，它是约定的测试数据库，当前无连接，不是本次删除的文件备份，仍保留用于后续验收。
+
+| 生产表 | 总占用（含索引） | 实际行数 |
+| --- | --- | --- |
+| `chat_message_index` | 522 MiB | 522,575 |
+| `chat_chunk_message` | 338 MiB | 887,352 |
+| `chat_retrieval_span` | 176 MiB | 34,694 |
+| `chat_chunk_index` | 93 MiB | 29,894 |
+| `groupmsg` | 74 MiB | 522,582 |
+
+明确发现及限制：
+
+- `chat_chunk_message` 有 **387,608 条**关联指向不存在的 `chat_chunk_index`，占该表约 43.7%；这些行的 `pg_column_size` 合计 **15,891,928 字节，约 15.2 MiB**，尚不包括相关索引。没有关联指向不存在的消息，也未发现消息索引缺失原始消息。另有 **22,831 条**消息索引的 `primary_chunk_id` 指向不存在的分块。应先调查分块重建的并发与引用清理，再安排修复，不能靠删聊天正文处理。
+- 四个大 B-tree 索引共约 **459 MiB**；只读解析页头发现，叶子页未分配空间与已标记删除页合计 **400,466,944 字节，约 382 MiB**。`ix_chat_chunk_message_message` 约 221 MiB、有效叶子页平均占用仅 **7.86%**；`ix_chat_message_primary_chunk` 约 93 MiB、平均占用 **8.85%**，另有约 46 MiB 已标记删除页，存在明显低密度和历史膨胀。索引定义和 ready/valid 标志均正常，不应根据崩溃后偏低的 idx_scan 统计直接删索引。
+- 页头检查依据 [PostgreSQL 15 页布局](https://www.postgresql.org/docs/15/storage-page-layout.html)与 [B-tree 页标志定义](https://github.com/postgres/postgres/blob/REL_15_STABLE/src/include/access/nbtree.h)，只统计页头和空间边界，不解码或输出索引键。活跃实例读取没有一致性快照，结果用于近似空间诊断；382 MiB 包含正常预留空间，**不是保证能立即归还文件系统的精确容量**，后续整理需实测。
+- 原始消息按群与平台 message_id 统计仅有 41 条额外重复记录，额外 payload 合计约 9 KiB，不是空间主因。主要消息字段的最大单行约 56 KiB；未在这些字段发现 MiB 级单条记录。检索 span 的正文约 63 MiB、token_text 约 70 MiB 属检索表示，不能仅因与原文有关就删除。
+- 本轮只完成排查。仍需修复词库超限重试、分块引用维护及日志大小上限，再评估清理孤儿关系和整理膨胀索引；本次没有把候选量描述为已释放空间。
+
 ## 2026-10-17 磁盘满导致群指令无响应与独立健康告警
 
 - 16:01（Asia/Shanghai）根分区可用空间为 0；csbot、NapCat、Mihomo、Docker 进程仍运行。PostgreSQL 反复在恢复检查点写 `pg_logical/replorigin_checkpoint.tmp` 时触发 `No space left on device`，拒绝连接；后端事件预处理和归档随之失败。NapCat 容器运行不能代表这条业务链路正常。
