@@ -1,5 +1,15 @@
 # 本地交付验收
 
+## 2026-10-23 安全补丁与入口限制
+
+- 本地固定依赖下 71 项合成测试通过，数据库集成夹具使用内存 SQLite、外部服务与 OneBot 使用 mock。额外用新 FastAPI/Starlette 验证文件返回、单/多 Range、有限畸形 Range、匿名认证拒绝和 SSE；未向生产发送攻击载荷、调用模型或发送测试 QQ 消息。Shell 语法、Git 差异检查通过。
+- 主机防火墙脚本在 Linux 隔离网络命名空间内连续运行两次，验证 IPv4/IPv6 规则和幂等性；安装后 systemd 校验通过，仅有既有 tat_agent PIDFile 路径提示。重启后管理链与 Docker 原始目的端口过滤实际存在。
+- Steam 镜像实际构建完成，隔离无网络容器中 Node `22.23.4` 与 sqlite3 原生模块加载成功。首次 Debian 编译工具下载缓慢；官方完整 Node 基础镜像已含工具链，最终 Dockerfile 移除重复 apt 安装。最终镜像 `sha256:5be44944abfa4028e5056bc098c89c80406d9758e3793b9da7cd93f567ea9dbc`。
+- 生产升级后实际启动到 `5.15.0-198-generic`，包管理 `dpkg --audit` 无异常，系统待更新为 0；自动安全更新 dry-run 确认允许 `jammy-security`。Docker、runc、SSH、OpenSSL、Nginx、PostgreSQL、Node 与 Python 实际版本见 SERVER_SERVICES.md。
+- 以 ubuntu、docker 附加组、实际 Node PATH、AI 状态和游戏库路径运行严格 preflight，通过固定 DSH/Mneme、源码清单、真实受限容器、两库只读 schema、Steam 就绪和磁盘检查。首次临时 preflight 漏传游戏库环境变量的失败、维护期间 Steam 未就绪的失败均已在完整环境和恢复后复验通过。
+- 公网 HTTPS 主页和 dashboard HTTP 200；既有测试令牌调用只读 `/api/status` HTTP 200，`/api/auth/verify` 返回 `isVerified=true`，匿名状态请求 HTTP 401；旧公网 1234 不再返回页面。没有新建测试令牌、改数据库结构或跑生产数据写入夹具。
+- 独立健康监控 11:12 dry-run `issues={}`，QQ 在线、Steam `ok/loggedOn/friendStatusReady=true`，数据库排序规则不匹配数为 0。Steam 在网络超时后自动退避恢复；未把最初 HTTP 503 描述为验收成功。未执行真实模型对话、QQ 测试发送或 TeamSpeak 客户端通话。
+
 ## 2026-10-17 归档词表查询参数超限修复
 
 - 后端 `877fb6de2135cf3e164376b6922dad66f7966fd2` 将增量词表的既有词频查询按 1,000 个候选词分批，避免 asyncpg 单条查询 32,767 个参数上限；不截断候选词，保留计分、群过滤、词频累加及最终保留数量。

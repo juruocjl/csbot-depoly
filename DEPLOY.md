@@ -60,6 +60,28 @@ systemctl is-active mihomo docker csbot
 
 服务器存在未跟踪的数据和辅助脚本，不能为“清理工作区”删除它们。发布前备份本次可能变更的配置和数据；数据库结构变更还须有单独的迁移与恢复方案。 后端 AI preflight 要求至少 800 MiB 可用磁盘；发布前必须把本次备份增量计入，确认**备份完成后**仍满足门槛。空间紧张时先准备压缩备份并逐文件校验其可恢复性，不要等停服后才触发磁盘门槛，也不要降低门槛或擅自删除历史数据。
 
+## 安全更新与管理端口
+
+管理 SSH 使用 Tailscale 的 `ubuntu@cgserver`。腾讯云防火墙拒绝公网 TCP 22、1234、10011；无规则的入站流量默认拒绝。保留 TCP 80/443（网页）、8443（DERP）、30033（TeamSpeak 文件传输），UDP 3478（STUN）、41641（Tailscale）、9987（TeamSpeak 语音）及既有 ICMP。控制台的防火墙和自动化助手可用于应急恢复，不将管理端口长期向所有来源开放。
+
+Compose 将 PostgreSQL 5432、Adminer 8081、NapCat 6099 和旧 Nginx 1234 仅映射到 `127.0.0.1`。管理页面使用 SSH 本地隧道；后端 8888 仍供 Nginx 容器经宿主机网关访问。`csbot-management-firewall.service` 对公网网卡 `eth0` 限制管理端口，并过滤 Docker 转发的原始目的端口，不覆盖 Tailscale 或原有规则。迁移机器时先确认公网网卡名称。
+
+按 Git 发布后安装版本控制中的模板：
+
+```bash
+sudo install -m 0644 /home/ubuntu/csbot/deploy/apt/52csbot-security-upgrades /etc/apt/apt.conf.d/
+sudo install -m 0755 /home/ubuntu/csbot/scripts/management_firewall.sh /usr/local/lib/csbot-management-firewall.sh
+sudo install -m 0644 /home/ubuntu/csbot/deploy/systemd/csbot-management-firewall.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now csbot-management-firewall.service
+```
+
+自动更新必须允许 `${distro_id}:${distro_codename}-security`；只有 `jammy` 基础仓库时，任务虽成功运行也不会安装安全仓库补丁。模板开启每日检查和安全更新，关闭自动整机重启。Docker CE 第三方仓库、容器镜像、Python 锁文件和专用 Node 需单独维护；操作系统更新不会自动刷新它们。
+
+内核与 Docker 升级前准备数据库可读归档、SQLite 一致性备份、会话与私有配置备份、原版本和镜像回退标签，并检查备份后的空间。预下载软件包和镜像，暂停守护、停止后端及会话容器，再升级、按需重启。跨重启维护时记录并临时关闭后端/守护的自动启动，依照服务清单恢复 Mihomo、Docker、各 Compose 项目和后端后，重新启用原有服务和 timer。不要反复启动 Steam 触发登录退避。
+
+Steam 构建使用完整 `node:22.23.4-bookworm` 中自带的编译工具。服务器下载慢时可限定本次构建使用 `--network=host --build-arg http_proxy=http://127.0.0.1:7890 --build-arg https_proxy=http://127.0.0.1:7890`；代理参数不写入运行环境。验收包含 Node/sqlite3 原生模块、严格 AI preflight、受保护 API、QQ/Steam 就绪与公网 HTTPS，不只检查静态页面。
+
 ## 磁盘与日志维护
 
 系统 journal 使用后端仓库模板 `deploy/systemd/journald.conf.d/60-csbot-retention.conf`，持久日志上限 512 MiB、单文件 64 MiB、最长保留 14 天，并尽量为文件系统留出 2 GiB。容量限制先到时，实际保留时间会短于 14 天；活跃日志和轮转时会有少量额外占用。这些设置不会删除其他目录以保证空闲空间。

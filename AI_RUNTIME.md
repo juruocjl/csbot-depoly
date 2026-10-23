@@ -115,7 +115,7 @@ uv run --frozen python scripts/ai_outbox.py --state data/ai/state.sqlite3 --id <
 
 1. 按通用发布流程核对并推送后端/前端目标 commit，备份数据库、`.env*`、`data/ai` 和图片。运行时数据不提交 Git。
 2. 生产仓库 `git pull --ff-only`。Python 最低 3.11，生产已有 3.12；执行 `uv sync --frozen`。本改造不要求新增 PostgreSQL 表或生成迁移，依赖既有聊天索引、token 字段、runtime_config 和 ai_mem；缺失时先按对应既有迁移文档处理。
-3. `bash scripts/install_ai_runtime.sh`：安装 Node **22.22.0 Linux x64** 至忽略的 `.tools/node`，下载官方 tar 并核对内置 SHA256，然后 npm ci 固定 DSH/Mneme。不会改系统 Node。非 Linux x64 应使用适配该平台且通过同一测试的 Node >=22.12。
+3. `bash scripts/install_ai_runtime.sh`：安装 Node **22.23.4 Linux x64** 至忽略的 `.tools/node`，下载官方 tar 并核对内置 SHA256，然后 npm ci 固定 DSH/Mneme。不会改系统 Node。非 Linux x64 应使用适配该平台且通过同一测试的 Node >=22.12。
 4. 构建脚本镜像（基础镜像摘要、Python 依赖均固定）：
 
 ```bash

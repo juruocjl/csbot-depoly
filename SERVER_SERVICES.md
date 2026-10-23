@@ -1,5 +1,14 @@
 # CSBot 服务器服务清单
 
+## 2026-10-23 安全更新与公网入口收敛
+
+- 已按用户授权完成生产更新及一次整机重启。后端版本 `3e04365739e47d855897343d5efa8e9c3ba3665a`，Steam Monitor `a14cb91886765f48b124d42e250834e655ddfdf1`，均经 GitHub 推送和服务器 `pull --ff-only` 发布。前端产物保持 `46631aa299731c0f09c34a83ec0b755f085ddc4e`，本轮未修改前端源码或构建。
+- 实际运行版本：内核 `5.15.0-198-generic`（包 `5.15.0-198.208`），OpenSSH `1:8.9p1-3ubuntu0.18`，OpenSSL `3.0.2-0ubuntu1.30`，Docker `29.9.2`、runc `1.5.2`；两处 Nginx `1.30.6`，PostgreSQL `15.19`，后端及 Steam Node 均为 `22.23.4`。Python 锁文件更新为 FastAPI `0.161.1`、Starlette `1.9.0`、aiohttp `3.14.5`、Tornado `6.6`。
+- 自动更新原先仅允许 `jammy`，已通过 `52csbot-security-upgrades` 加入 `jammy-security`，关闭自动整机重启。升级后系统报告可立即安装更新为 0；自动更新 dry-run 实际列出两个来源且无待升级包。没有跨 Ubuntu 或 PostgreSQL 大版本升级，也没有生成业务迁移。
+- 腾讯云实例 `lhins-5fbeys5j` 的公网 TCP 22、1234、10011 改为拒绝；保留 HTTPS、HTTP 跳转、DERP/STUN、Tailscale 及 TeamSpeak 语音/文件传输。SSH 管理使用 Tailscale。PostgreSQL 5432、Adminer 8081、NapCat 6099、旧 Nginx 1234 仅映射到回环地址；`csbot-management-firewall.service` 限制 `eth0` 的管理端口及 Docker 转发，并已在重启后复验。Mihomo 9090 仍监听通配地址且要求认证，公网由两层防火墙拒绝；后端 8888 保留容器网关访问。
+- 本次新建私有恢复材料位于 `/home/ubuntu/backups/security-20261023-104145`（目录 root、0700）：包含数据库 custom dump 与 globals、停后端后的 AI 归档及 SQLite 备份、图片硬链接快照、QQ/TeamSpeak 会话、Steam SQLite、原私有配置/包版本/防火墙及 Node。数据库归档经 `pg_restore --list` 验证，SQLite 完整性为 `ok`；旧镜像保留 `*:security-rollback-20261023` 标签。本目录为本次维护新建，不代表下文历史已删除备份重新存在。
+- 11:12（Asia/Shanghai）严格服务身份 preflight 通过；独立健康检查 `issues={}`，QQ/Steam 就绪，PostgreSQL 排序规则版本不匹配数为 0，公网主页、dashboard、受保护状态及认证验证通过，匿名被拒绝，旧公网 1234 已不可访问。Steam 在启动时网络超时后按原有退避自动恢复，未通过反复重启强制登录；恢复期间 watcher 曾记录 Steam 未就绪异常。最终服务状态与验证边界见 DELIVERY_CHECK.md，根盘约剩 10.2 GiB。
+
 ## 2026-10-19 清理遗留错误日志并解除体积告警
 
 - 17:19（Asia/Shanghai）确认唯一活动告警为 `log_size:err.log`：错误日志 **242,765,896 字节（231.52 MiB，告警取整为 232 MiB）**，最后写入时间为当日 02:36:11；前后采样大小一致。当前 `app.log` 已轮转至约 3.32 MiB，归档 `sent` 积压为 0，没有再次出现此前的词表参数超限/归档重试错误。
@@ -23,7 +32,7 @@
 
 ## 2026-10-17 历史备份及闲置副本删除、数据库只读空间排查
 
-**当前恢复材料状态：用户明确要求“删除所有备份，只保留一套生产目录”后，`/home/ubuntu/backups/` 已清空。本文其他历史章节记录的该目录下备份路径均已删除，不能再作为现存恢复材料使用。**
+**2026-10-17 清理后的恢复材料状态：用户明确要求“删除所有备份，只保留一套生产目录”后，`/home/ubuntu/backups/` 当时已清空。该日期以前历史章节中的备份均已删除，不能作为现存恢复材料使用；2026-10-23 新建维护备份另见本文顶部。**
 
 - 删除前确认备份目录不是符号链接、不含挂载，也不被生产服务或容器使用；按 inode 区分独占与共享文件。清空 35 个顶层备份目录及 4 个顶层文件，根盘可用空间净增 10,021,933,056 字节。随后删除生产目录中 22 个已核实未跟踪的旧环境/动态配置备份文件及约 64 MiB 的旧 Git 备份目录，保留当前 `.env`、`.env.prod`。
 - 按只保留生产目录的要求，进一步核实并删除四个无进程/容器/挂载依赖的旧副本：`csbot-watchstage-test`、`csbot-ai-validation`、`csbot_chat_history_test`、旧 `steam_monitor`。合计独占约 698 MiB，实测可用空间再增加 731,840,512 字节；共享依赖硬链接没有重复计入释放量。当前生产后端 `/home/ubuntu/csbot`、其中前端 `dist`、`/home/ubuntu/steam_monitor_js` 及其运行数据保留。
@@ -297,18 +306,18 @@ flowchart LR
 | 服务 | 镜像或管理方式 | 宿主机监听 | 持久化/配置来源 |
 | --- | --- | --- | --- |
 | 后端 | systemd + uv | `0.0.0.0:8888` | `/home/ubuntu/csbot/.env.prod` |
-| Nginx | `nginx:alpine` | 所有地址 TCP 1234 → 容器 80 | `assets/default.conf`、`dist/`、`imgs/` |
-| HTTPS 域名入口 Nginx | `nginx:alpine` | 所有地址 TCP 80/443 → 容器 80/443 | `assets/homepage.conf`、`assets/homepage/`、`dist/`、`imgs/`、`/var/lib/ave-mujica-tls`，只读挂载 |
+| Nginx | `nginx:1.30.6-alpine` | 回环 TCP 1234 → 容器 80 | `assets/default.conf`、`dist/`、`imgs/` |
+| HTTPS 域名入口 Nginx | `nginx:1.30.6-alpine` | 所有地址 TCP 80/443 → 容器 80/443 | `assets/homepage.conf`、`assets/homepage/`、`dist/`、`imgs/`、`/var/lib/ave-mujica-tls`，只读挂载 |
 | DERP | `derper.service` | TCP 8443、UDP 3478 | `/var/lib/derper/identity.json`、共享证书目录 `current` |
 | 证书签发/续签 | lego + `derper-acme-issue/renew.service`、`derper-acme-renew.timer` | 阿里云 DNS-01，每日检查 | `/etc/derper-acme/`、`/var/lib/derper-acme/`、`/var/lib/ave-mujica-tls/` |
-| PostgreSQL | `postgres:15-alpine` | 所有地址 TCP 5432 | `pg_data/` |
-| Adminer | `adminer` | 所有地址 TCP 8081 → 容器 8080 | 无持久卷 |
-| NapCat | `mlikiowa/napcat-docker:latest` | 所有地址 TCP 6099 | `napcat/config/`、`ntqq/` |
+| PostgreSQL | `postgres:15.19-alpine` | 回环 TCP 5432 | `pg_data/` |
+| Adminer | `adminer` | 回环 TCP 8081 → 容器 8080 | 无持久卷 |
+| NapCat | `mlikiowa/napcat-docker:latest` | 回环 TCP 6099 | `napcat/config/`、`ntqq/` |
 | Steam Monitor | `steam-monitor-js:latest` | `127.0.0.1:5555`，host 网络 | 自身 `.env`、`data/`，只读挂载 Mihomo resources |
 | TeamSpeak | `teamspeak:latest` | host 网络，TCP 10011、30033 | `/home/ubuntu/ts/data` |
 | Mihomo | systemd | 回环 TCP 7890、7891、7893；通配地址 TCP 9090、1053 | `/home/ubuntu/clashctl/resources/runtime.yaml` |
 
-此表为宿主机观察结果，不代表公网可达；本轮未审计云安全组、防火墙或 UDP。旧文档把控制端口写成仅回环不符合当前监听，客户端仍通过 `127.0.0.1:9090` 访问。
+此表的端口映射及镜像版本已按 2026-10-23 更新；公网允许范围与两层防火墙见顶部安全维护记录。Mihomo 控制端口仍为通配监听，客户端通过 `127.0.0.1:9090` 访问，不能把访问地址当作监听限制。
 
 ### 当前文档覆盖差异
 
