@@ -2,7 +2,8 @@
 
 ## 2026-10-24 赛事自动监视上线
 
-- 按用户授权发布后端赛事自动监视：16:13 从 `3e04365739e47d855897343d5efa8e9c3ba3665a` 经 GitHub `pull --ff-only` 更新到 `2fc2655d5a7e36a8e9ac71237d0f3135331a6475` 并重启 `csbot.service`；随后修复 loguru 占位符输出，发布 `e8bbf53d1c70670044b4a348476708b2cfd059e8` 并再次重启。最终 MainPID `597193`、`NRestarts=0`、active，插件加载成功，启动日志无错误。
+- 按用户授权发布后端赛事自动监视：16:13 从 `3e04365739e47d855897343d5efa8e9c3ba3665a` 经 GitHub `pull --ff-only` 更新到 `2fc2655d5a7e36a8e9ac71237d0f3135331a6475` 并重启；随后发布日志修复 `e8bbf53d1c70670044b4a348476708b2cfd059e8`，再发布错峰调度 `f523ed487ef8f5aaf3a3de2c1b9f349fdbdfbc50` 并重启。最终 MainPID `602461`、`NRestarts=0`、active，插件加载成功，启动日志无错误。
+- 结果抓取已从“每 5 分钟一次性抓完所有进行中赛事”改为每分钟调度、按赛事错峰：每赛事约 5 分钟一轮，首次/重启后偏移 30–290 秒，单分钟最多 2 个赛事、2 秒间隔。16:32:00、16:38:00、16:44:00 各抓取一次 8050，按约 5–6 分钟错开；16:46:00 自然调度再次刷新列表（6 个赛事，1 个进行中）。单元测试用 4 个进行中赛事验证各分钟只触发 1 个请求。
 - 16:15:00 自然调度首次自动刷新监视列表，选中 `PGL 布加勒斯特大师赛 2026(8050)`、`MESA Pro 2026 万圣节杯(9462)`、`RLG特斯拉杯 2026(9434)`、`HyperX Retake 第13赛季(9427)`、`IEM 北京 2026(8245)`、`BLAST 对抗赛 2026 S2(8251)`。数据库 `runtime_config.hltv_event_id_list=[8050,9462,9434,9427,8245,8251]`、`updated_by=auto`；`hltv_followed_teams=["TYLOO","LVG","FaZe","BC.Game"]`；`local_storage.hltv_discovery_failures=0`。
 - 最终验收：后端回环探测 HTTP 404（服务已响应）、前端 HTTPS 200、`csbot.service` active/NRestarts=0、重启后无 error 级日志。前端 `dist`、Steam Monitor、Compose、数据库结构和依赖均未改动；未生成迁移，未发送 QQ 测试消息。
 
