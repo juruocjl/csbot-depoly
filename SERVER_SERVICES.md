@@ -1,5 +1,11 @@
 # CSBot 服务器服务清单
 
+## 2026-10-24 赛事自动监视上线
+
+- 按用户授权发布后端赛事自动监视：16:13 从 `3e04365739e47d855897343d5efa8e9c3ba3665a` 经 GitHub `pull --ff-only` 更新到 `2fc2655d5a7e36a8e9ac71237d0f3135331a6475` 并重启 `csbot.service`；随后修复 loguru 占位符输出，发布 `e8bbf53d1c70670044b4a348476708b2cfd059e8` 并再次重启。最终 MainPID `597193`、`NRestarts=0`、active，插件加载成功，启动日志无错误。
+- 16:15:00 自然调度首次自动刷新监视列表，选中 `PGL 布加勒斯特大师赛 2026(8050)`、`MESA Pro 2026 万圣节杯(9462)`、`RLG特斯拉杯 2026(9434)`、`HyperX Retake 第13赛季(9427)`、`IEM 北京 2026(8245)`、`BLAST 对抗赛 2026 S2(8251)`。数据库 `runtime_config.hltv_event_id_list=[8050,9462,9434,9427,8245,8251]`、`updated_by=auto`；`hltv_followed_teams=["TYLOO","LVG","FaZe","BC.Game"]`；`local_storage.hltv_discovery_failures=0`。
+- 最终验收：后端回环探测 HTTP 404（服务已响应）、前端 HTTPS 200、`csbot.service` active/NRestarts=0、重启后无 error 级日志。前端 `dist`、Steam Monitor、Compose、数据库结构和依赖均未改动；未生成迁移，未发送 QQ 测试消息。
+
 ## 2026-10-23 安全更新与公网入口收敛
 
 - 已按用户授权完成生产更新及一次整机重启。后端版本 `3e04365739e47d855897343d5efa8e9c3ba3665a`，Steam Monitor `a14cb91886765f48b124d42e250834e655ddfdf1`，均经 GitHub 推送和服务器 `pull --ff-only` 发布。前端产物保持 `46631aa299731c0f09c34a83ec0b755f085ddc4e`，本轮未修改前端源码或构建。
