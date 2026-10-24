@@ -1,5 +1,13 @@
 # 本地交付验收
 
+## 2026-10-24 赛事自动监视与结果提醒
+
+- 后端 `2fc2655d5a7e36a8e9ac71237d0f3135331a6475`：`hltv_event_id_list` 改为自动维护；每 30 分钟用 5E 赛事列表重建列表，保留进行中/即将开始且满足“关注队伍参赛”或“Major/S/S+ 级”的赛事，结束后移除。新增 `hltv_followed_teams`，默认 `TYLOO`、`LVG`、`FaZe`、`BC.Game`，匹配忽略大小写和标点，`bcg` 可匹配 `BC.Game`。
+- 通知规则：Major/S/S+ 级赛事的全部新结果推送；其他被监视赛事只推送涉及关注队伍的结果，未推送的结果仍写入 `hltvresult{event}` 并调用 `event_update`。`hltv_event_list_v1` 的 `teams`/`grade` 用于自动筛选，`event_session_list` 按 `tt_info.id` 再过滤一次，避免 5E 在无赛程时返回其他赛事的热门比赛而被记到错误赛事下。
+- 频控：发现请求每 30 分钟 1 次（最多 2 页）；结果抓取只针对进行中赛事，每 5 分钟每个赛事 1 次，单轮最多 8 个赛事、请求间隔 2 秒；即将开始的赛事不抓取。403/429 触发 30 分钟冷却，发现失败按 5/10/20/40/60 分钟退避。按当前规模估算最坏约 98 次/小时（约 1.6 次/分钟），不抓完整历史页，避免连续突发请求。
+- 验收：`checks/hltv_watcher_logic_test.py` 16 项、`checks/hltv_watcher_runtime_test.py` 6 项、`checks/runtime_config_logic_test.py` 15 项、`checks/live_watcher_test.py` 14 项回归通过；`nonebot.load_plugin` 实际加载 `hltv_watcher` 成功。实际只读探测 5E 赛事列表返回 20 个赛事，按默认关注队伍选中 6 个；`event_session_list` 的跨赛事兜底行已被 `tt_info.id` 过滤。未连接生产库、未写数据库、未发送 QQ 测试消息。
+- 本轮仅推送 GitHub，尚未生产发布；服务器需 `pull --ff-only` 并重启 `csbot.service` 后才生效。
+
 ## 2026-10-23 安全补丁与入口限制
 
 - 本地固定依赖下 71 项合成测试通过，数据库集成夹具使用内存 SQLite、外部服务与 OneBot 使用 mock。额外用新 FastAPI/Starlette 验证文件返回、单/多 Range、有限畸形 Range、匿名认证拒绝和 SSE；未向生产发送攻击载荷、调用模型或发送测试 QQ 消息。Shell 语法、Git 差异检查通过。
