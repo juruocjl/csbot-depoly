@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-10-25 NapCat 6099 开放 Tailscale 内网
+
+- 按用户要求保留公网关闭，为 `http://cgserver:6099/webui/` 增加持久内网入口。后端版本 `80b90969e57f8c7a9298094c06a94c3584d8d370` 新增 `scripts/enable_napcat_tailnet.sh`，经 GitHub 推送与生产精确 `pull --ff-only` 发布后执行。Tailscale Serve `--bg --tcp=6099` 将 Tailnet 流量转到 `127.0.0.1:6099`，没有启用 Funnel，NapCat Compose 仍仅映射回环。
+- 17:43（Asia/Shanghai）实测监听为 `100.101.30.74%tailscale0:6099`、`[fd7a:115c:a1e0::2301:1e87]%tailscale0:6099` 及原 `127.0.0.1:6099`；没有公网/通配地址监听。IPv4/IPv6 公网管理链与 Docker 转发限制保持，6099 仍在拒绝列表。
+- Mac 直接通过 `cgserver` 取得 WebUI HTTP 200，关闭本次临时 16099 SSH 隧道后复验仍为 200。未认证登录状态 API 返回 NapCat `code=-1`，没有返回管理数据。公网 `42.193.244.178:6099/webui/` 的 HTTP 探测未取得响应（curl HTTP 000），服务器公网地址探测也失败，回环与 Tailnet 地址均 HTTP 200。本机代理 TUN 会提前接受 TCP，因此没有把单纯 socket 建连结果作为公网开放证据。
+- 后端 MainPID `861250`、active、NRestarts=0，七个生产容器 ID 均保持；未重启 NapCat、Bot、Docker 或 Tailscale，未修改令牌、会话或数据库。Serve 配置已持久保存，关闭方式见 DEPLOY.md。QQ 仍为 `waiting_qrcode`，需要用户在可直连的 WebUI 扫码登录。
+
 ## 2026-10-24 赛事自动监视上线
 
 - 按用户授权发布后端赛事自动监视：16:13 从 `3e04365739e47d855897343d5efa8e9c3ba3665a` 经 GitHub `pull --ff-only` 更新到 `2fc2655d5a7e36a8e9ac71237d0f3135331a6475` 并重启；随后发布日志修复 `e8bbf53d1c70670044b4a348476708b2cfd059e8`，再发布错峰调度 `f523ed487ef8f5aaf3a3de2c1b9f349fdbdfbc50`，最后发布长赛事发现修复 `3517177ee35d3e0c59414f84106852c97240c320` 并重启。最终 MainPID `672801`、`NRestarts=0`、active，插件加载成功，启动日志无错误。
@@ -320,7 +327,7 @@ flowchart LR
 | 证书签发/续签 | lego + `derper-acme-issue/renew.service`、`derper-acme-renew.timer` | 阿里云 DNS-01，每日检查 | `/etc/derper-acme/`、`/var/lib/derper-acme/`、`/var/lib/ave-mujica-tls/` |
 | PostgreSQL | `postgres:15.19-alpine` | 回环 TCP 5432 | `pg_data/` |
 | Adminer | `adminer` | 回环 TCP 8081 → 容器 8080 | 无持久卷 |
-| NapCat | `mlikiowa/napcat-docker:latest` | 回环 TCP 6099 | `napcat/config/`、`ntqq/` |
+| NapCat | `mlikiowa/napcat-docker:latest` | 回环 TCP 6099；另由 Tailscale Serve 提供内网 TCP 6099 | `napcat/config/`、`ntqq/` |
 | Steam Monitor | `steam-monitor-js:latest` | `127.0.0.1:5555`，host 网络 | 自身 `.env`、`data/`，只读挂载 Mihomo resources |
 | TeamSpeak | `teamspeak:latest` | host 网络，TCP 10011、30033 | `/home/ubuntu/ts/data` |
 | Mihomo | systemd | 回环 TCP 7890、7891、7893；通配地址 TCP 9090、1053 | `/home/ubuntu/clashctl/resources/runtime.yaml` |

@@ -1,5 +1,11 @@
 # 本地交付验收
 
+## 2026-10-25 NapCat Tailscale 6099
+
+- `scripts/enable_napcat_tailnet.sh` 的 Bash 语法和 Git 差异检查通过；生产 Tailscale 1.104.2 实际执行成功，状态仅新增 TCP 6099 到 `127.0.0.1:6099`，`AllowFunnel={}`。配置语义及持久化依据见 DEPLOY.md 中的官方文档；本次未重启服务器验证启动恢复。
+- Mac 直接访问 `http://cgserver:6099/webui/` HTTP 200，解析为实际 Tailnet 地址；匿名管理 API 返回 NapCat `code=-1`，认证仍生效。服务器监听限定 Tailnet IPv4/IPv6 接口和既有回环，公网两类管理过滤均保留，公网 HTTP 探测无页面响应；没有把受 TUN 影响的 socket 建连成功误认为公网 WebUI 开放。
+- 后端 PID/NRestarts、七容器 ID 保持；本次临时 SSH 隧道已关闭，随后继续用 Tailnet 地址验收。没有重启业务服务、改令牌或数据；QQ 已失效的登录仍需用户扫码，管理页可用不能代替登录成功或真实群收发验收。
+
 ## 2026-10-24 赛事自动监视与结果提醒
 
 - 后端 `2fc2655d5a7e36a8e9ac71237d0f3135331a6475`：`hltv_event_id_list` 改为自动维护；每 30 分钟用 5E 赛事列表重建列表，保留进行中/即将开始且满足“关注队伍参赛”或“Major/S/S+ 级”的赛事，结束后移除。新增 `hltv_followed_teams`，默认 `TYLOO`、`LVG`、`FaZe`、`BC.Game`，匹配忽略大小写和标点，`bcg` 可匹配 `BC.Game`。

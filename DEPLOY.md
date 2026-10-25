@@ -64,7 +64,17 @@ systemctl is-active mihomo docker csbot
 
 管理 SSH 使用 Tailscale 的 `ubuntu@cgserver`。腾讯云防火墙拒绝公网 TCP 22、1234、10011；无规则的入站流量默认拒绝。保留 TCP 80/443（网页）、8443（DERP）、30033（TeamSpeak 文件传输），UDP 3478（STUN）、41641（Tailscale）、9987（TeamSpeak 语音）及既有 ICMP。控制台的防火墙和自动化助手可用于应急恢复，不将管理端口长期向所有来源开放。
 
-Compose 将 PostgreSQL 5432、Adminer 8081、NapCat 6099 和旧 Nginx 1234 仅映射到 `127.0.0.1`。管理页面使用 SSH 本地隧道；后端 8888 仍供 Nginx 容器经宿主机网关访问。`csbot-management-firewall.service` 对公网网卡 `eth0` 限制管理端口，并过滤 Docker 转发的原始目的端口，不覆盖 Tailscale 或原有规则。迁移机器时先确认公网网卡名称。
+Compose 将 PostgreSQL 5432、Adminer 8081、NapCat 6099 和旧 Nginx 1234 仅映射到 `127.0.0.1`。NapCat 另通过 Tailscale Serve 的 TCP 6099 转发到回环 6099，连接 Tailscale 后可直接访问 `http://cgserver:6099/webui/`；其余管理页面仍使用 SSH 本地隧道。后端 8888 仍供 Nginx 容器经宿主机网关访问。`csbot-management-firewall.service` 对公网网卡 `eth0` 限制管理端口，并过滤 Docker 转发的原始目的端口，不覆盖 Tailscale 或原有规则。迁移机器时先确认公网网卡名称。
+
+在后端脚本经 Git 发布后启用 NapCat 内网入口（不需要重建容器）：
+
+```bash
+cd /home/ubuntu/csbot
+sudo bash scripts/enable_napcat_tailnet.sh
+sudo tailscale serve status
+```
+
+脚本仅设置 `--tcp=6099` 到 `tcp://127.0.0.1:6099`，保留 NapCat 原认证、Docker 回环绑定和公网过滤，不启用 Funnel。`--bg` 配置由 Tailscale 持久保存并在重启后恢复，见 [Tailscale Serve 官方说明](https://tailscale.com/docs/reference/tailscale-cli/serve#effects-of-rebooting-and-restarting)。回退只执行 `sudo tailscale serve --bg --tcp=6099 off`，不要使用会清空其他入口的 `serve reset`。
 
 按 Git 发布后安装版本控制中的模板：
 
