@@ -1,6 +1,14 @@
 # CSBot 服务器服务清单
 
 
+
+## 2026-11-02 FaZe/Vitality 队标显示修复
+
+- 20:45:33（Asia/Shanghai）仅更新生产前端：源码 `af2074b319af1cbe9b4d4e525968b5a9e67c28a1`，对应 [Actions 41446818457](https://github.com/juruocjl/csbot-front/actions/runs/41446818457) success；`/home/ubuntu/csbot/dist` 从 `1e50792546782d4de3e99b88e4f7a5631dd24543` 经 `pull --ff-only` 快进到 `38f434ed773ae75d7f09d30c454f0c9e8b7a6509`。
+- 5E `merge_*` 双主题队标在浅色赛程卡片与关注搜索结果中先裁出左侧深色版，再显示；采集、接口、截图 metadata 保留原始图片地址。已有缓存直接生效，无数据库迁移和后端更新，MainPID `847273`、NRestarts=0、active 保持；两项守护 timer active。
+- 20:46 健康探测 `issues={}`，公网赛程 HTTP 200。使用既有令牌调用真实 `get_screenshot` 读取用户给定的个人赛程，PNG 90,735 字节、metadata 4 场，FaZe/Vitality 原始 URL 保持且令牌被排除；未创建测试订阅、未发 QQ 验收消息。原产物版本和本次截图保存在私有 `/home/ubuntu/backups/schedule-20261102-QPQIDz/team-logo-fix/`。
+
+
 ## 2026-11-02 赛程、个人关注与开赛/赛果提醒发布
 
 - 按用户授权发布：后端从 `d6a076f2450a1465c694fd607f29da7166561e77` 经 GitHub、`pull --ff-only` 更新到最终 `5348641714fefeed6f8e0bb07026b29f2907bb26`（含补充的开赛提醒）；前端源码 `be8e07e19fe7d2cca295cb2d35e998429ee7e5aa`，对应 [Actions 41424648976](https://github.com/juruocjl/csbot-front/actions/runs/41424648976) success，线上 build-output 从 `46631aa299731c0f09c34a83ec0b755f085ddc4e` 快进至 `1e50792546782d4de3e99b88e4f7a5631dd24543`。

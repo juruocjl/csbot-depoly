@@ -1,6 +1,15 @@
 # 本地交付验收
 
 
+
+## 2026-11-02 队标双主题合图显示修复
+
+- 根因已对照 5E 网页 DOM 与实际图片：FaZe、Vitality 的 `merge_*` PNG 为 600×300 双主题合图，5E 深色网页裁取第 1 块后显示。赛程浅色卡片改为统一裁取第 0 块并缩放至 150×150，浏览器显示 28×28；赛程双方队标和关注搜索结果共用同一处理函数。接口及 metadata 保留原始 URL，普通队标与其他来源地址不改。
+- 前端 14 项检查通过（含新增的 FaZe/Vitality 合图、重复处理、普通图片、其他主机和既有 query 保留检查），定向 TypeScript 与 Vite 构建通过。实际浏览器确认 FaZe、Vitality 均加载为单个 150×150 资源，FURIA、MOUZ、TYLOO、Falcons 保留原始普通图片，卡片高度不变。
+- 前端源码 `af2074b319af1cbe9b4d4e525968b5a9e67c28a1` 已推送；[Actions 41446818457](https://github.com/juruocjl/csbot-front/actions/runs/41446818457) success，产物 `38f434ed773ae75d7f09d30c454f0c9e8b7a6509` 于 20:45:33（Asia/Shanghai）经服务器 `pull --ff-only` 发布。后端仍为 `5348641`、MainPID `847273`、NRestarts=0，没有迁移数据库或重启后端。健康监控 dry-run `issues={}`。
+- 生产实际 `get_screenshot` 已验证个人赛程 PNG（90,735 字节）和 4 场完整 metadata，FaZe/Vitality 原始 URL 仍保留，令牌未进入归档；未发送 QQ 验收消息。
+
+
 ## 2026-11-02 生产发布及开赛提醒验收
 
 - 用户追加“关注队伍开打也通知”后，后端 `5348641` 新增状态转 live 的群内 @提醒；使用保留版本 0 与从 1 开始的赛果版本分别去重，无需第二次生产迁移。默认关注队伍/个人关注生效，Major 身份单独不触发开赛广播，`/关闭比赛提醒` 兼容关闭当前群的两类提醒。
