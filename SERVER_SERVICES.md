@@ -1,5 +1,13 @@
 # CSBot 服务器服务清单
 
+## 2026-11-02 Mihomo 订阅更换为 E-IX
+
+- 按用户要求把订阅从 `subs.wallesspku.space` 换为 `api.usfoo.com`（机场名 E-IX，62 个 `ss` 节点）。clashctl 路径为新增 `profiles.yaml` 条目 `id: 4` 并切 `use: 4`；未删除旧订阅 `id: 1`。端口 7890/7891/9090 与 `mixin.yaml` 的 `secret`、`socks-port` 覆盖保持不变。备份在 `/home/ubuntu/backups/mihomo-subswitch-20261102-154004/`。
+- 新订阅自带 `Auto`（url-test）与 `Fallback` 组，但实测 62 个节点仅 32 个可用；Singapore、Taiwan、Germany、Canada、Ireland、Malaysia、Mexico、Argentina 全部不可用，`Auto` 曾自动选中已失效的 `Singapore 03` 导致短暂断网。已手动固定 `E-IX` 与 `Steam` 组到 `🇭🇰 Hong Kong 06`（约 204 ms），机场修复前不建议启用 `Auto`。
+- 故障转移组名写死问题：Steam Monitor 原配置 `CLASH_FAILOVER_GROUP=🧱 GFW`，新订阅没有该组，探测返回 `Clash API HTTP 404`，自动切节点完全失效。`steam_monitor_js` 提交 `7dd4d95` 改为 `E-IX` 并从 GitHub 发布，服务器精确 `pull --ff-only` 对齐；重建 `steam_monitor` 容器后 15 秒恢复登录，`ok/loggedOn/friendStatusReady` 均 true、`recoveryMode=false`。
+- 本地两个子仓库 remote 原为 HTTPS 且无凭据，导致 push 报 `could not read Username`；已把 `csbot-front`、`steam_monitor_js` 的 remote 改为 `git@github.com:`，四个仓库统一走 SSH。推送前置的服务器本地 `git am` 提交 `078ac40` 与线上 `7dd4d95` 树内容相同，已 `reset --hard origin/main` 对齐。
+- 验收：mihomo active/NRestarts=0，`api.github.com` 200、`codeload` 200，后端 active/NRestarts=0，七个容器 running。**未**恢复或改动 Mihomo 以下的服务；订阅 token 属敏感凭据，未写入仓库、日志或命令输出。剩余流量约 242 GB（总量 1 TiB），到期 2027-06-15。
+
 ## 2026-10-25 NapCat 6099 开放 Tailscale 内网
 
 - 按用户要求保留公网关闭，为 `http://cgserver:6099/webui/` 增加持久内网入口。后端版本 `80b90969e57f8c7a9298094c06a94c3584d8d370` 新增 `scripts/enable_napcat_tailnet.sh`，经 GitHub 推送与生产精确 `pull --ff-only` 发布后执行。Tailscale Serve `--bg --tcp=6099` 将 Tailnet 流量转到 `127.0.0.1:6099`，没有启用 Funnel，NapCat Compose 仍仅映射回环。
