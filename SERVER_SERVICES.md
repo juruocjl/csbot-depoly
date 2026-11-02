@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-11-02 赛程截图定时撤回发布（11-03 验收）
+
+- 用户授权修改并部署 `/赛程`、`/我的赛程` 的截图撤回。后端从 `5348641714fefeed6f8e0bb07026b29f2907bb26` 经 GitHub、`pull --ff-only` 更新到 `21b4a03fe6a3d8d0869a117c580f92a091d1dc98`；2026-11-02 23:43:25（Asia/Shanghai）恢复服务，MainPID `956764`、NRestarts=0、active。生产实际配置为默认 90 秒，插件加载和 OneBot 连接成功。
+- 两条命令发图成功后，按回执 ID 启动计时并撤回该截图。配置 `CS_SCHEDULE_AUTO_DELETE_SECONDS=0` 关闭；用户指令、提示文字、开赛与赛果通知保留。计时任务仅在当前进程内保存，重启不补撤。没有数据库结构、依赖、前端或容器改动；前端源码仍为 `af2074b319af1cbe9b4d4e525968b5a9e67c28a1`，线上产物仍为 `38f434ed773ae75d7f09d30c454f0c9e8b7a6509`。
+- 发布前确认 AI queued/running 和 outbound pending/sent 为 0，暂停两项守护 timer 并停止后端。私有恢复目录 `/home/ubuntu/backups/schedule-auto-recall-20261102-iB4Fee/` 包含原版本/环境/systemd、PostgreSQL custom dump（135,101,152 字节）和 globals、完整 AI 压缩归档（64,965,121 字节）、SQLite backup API 副本及图片硬链接快照。数据库归档逐流读取、gzip 和 SQLite integrity_check 均通过；服务身份严格 preflight 通过，发布后恢复原 timer。
+- 2026-11-03 00:45:34 健康监控 dry-run `issues={}`，磁盘可用 9,538 MiB、内存可用 1,389 MiB；后端、Mihomo、Docker、两项 timer 正常，七个容器运行且 Steam Monitor healthy。启动日志无 error/critical。受保护赛程、个人查询、固定队伍 ID 搜索、匿名与无效 QQ 拒绝、HTTPS 资源验收通过，返回 26 场缓存比赛。线上 mock 撤回检查 8 项与源码边界 2 项通过；未向 QQ 发送验收消息，真实平台撤回仍以自然命令执行为准。
+
 
 
 ## 2026-11-02 FaZe/Vitality 队标显示修复
