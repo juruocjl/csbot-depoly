@@ -1,5 +1,17 @@
 # CSBot 服务器服务清单
 
+
+## 2026-11-02 赛程、个人关注与开赛/赛果提醒发布
+
+- 按用户授权发布：后端从 `d6a076f2450a1465c694fd607f29da7166561e77` 经 GitHub、`pull --ff-only` 更新到最终 `5348641714fefeed6f8e0bb07026b29f2907bb26`（含补充的开赛提醒）；前端源码 `be8e07e19fe7d2cca295cb2d35e998429ee7e5aa`，对应 [Actions 41424648976](https://github.com/juruocjl/csbot-front/actions/runs/41424648976) success，线上 build-output 从 `46631aa299731c0f09c34a83ec0b755f085ddc4e` 快进至 `1e50792546782d4de3e99b88e4f7a5631dd24543`。
+- 生产 Alembic 基线实查为 `20260826_add_runtime_config`，无既存赛程表；执行已审查的明确迁移到 `20261102_add_schedule`，核对新增 8 张 `schedule_*` 表。未自动生成迁移、未覆盖既有季节/模型/关注默认值。为初始化新缓存，在既有冷却期已结束的条件下把一次赛事发现调度设为到期，再由正常调度维护。
+- 发布前 AI queued/running、outbound pending/sent 均为 0，短暂停止内存守护/健康告警 timer 及后端后准备一致性恢复材料。私有目录 `/home/ubuntu/backups/schedule-20261102-QPQIDz/`：PostgreSQL custom dump 134,878,220 字节，globals、原配置/版本、完整 AI 压缩归档、SQLite backup API 副本及图片硬链接快照。数据库归档逐流读取验证、gzip 校验与 SQLite integrity_check 均通过；备份后空闲约 10 GiB。开赛提醒补充发布前，另在该目录 `start-reminders/` 保存当时的数据库和 AI 状态，归档同样校验通过。
+- 两次服务身份严格 preflight（ubuntu + docker supplementary group、既有 Node 22.23.4）均通过。首次后端于 18:08:44 恢复，前端于 18:09:46 切换；开赛提醒版本于 **18:30:15（Asia/Shanghai）** 恢复，最终 MainPID `847273`、NRestarts=0、active，原 timer 均恢复 active。未重建业务容器、未改 Mihomo/Steam 配置、未调用按进程名强杀脚本。
+- 18:31 只读健康探测 `issues={}`，磁盘可用约 10,002 MiB、内存可用约 1,554 MiB；Mihomo、Docker、后端及两项守护 timer 正常，Steam `ok/loggedOn/friendStatusReady=true`。公网赛程入口和对应 JS/CSS HTTP 200。
+- 使用既有测试令牌验证真实生产受保护赛程、指定 QQ 查询、固定 TYLOO ID 搜索、匿名拒绝与无效 QQ 拒绝。自然调度已抓到赛程，验收时返回 29 场、其中 2 场 live；星级与固定队伍 ID 有效，未在生产创建订阅夹具或新令牌。实际已部署 `get_screenshot` 生成 PNG 135,104 字节，截图 metadata 含 10 场完整比赛、固定队伍 ID 和星级，排除令牌；未向 QQ 发验收消息。
+- 开赛提醒以真实 `live` 状态为准，默认关注队伍发默认群，个人关注发订阅群并合并 @；Major 级别本身不触发所有比赛的开赛广播。开赛与完赛分别去重；已开打后再关注不补开赛提醒，结束后取消过期的未发开赛提醒。按既有约 5 分钟抓取节奏确认状态，保留源站更新延迟。
+
+
 ## 2026-11-02 Mihomo 订阅更换为 E-IX
 
 - 按用户要求把订阅从 `subs.wallesspku.space` 换为 `api.usfoo.com`（机场名 E-IX，62 个 `ss` 节点）。clashctl 路径为新增 `profiles.yaml` 条目 `id: 4` 并切 `use: 4`；未删除旧订阅 `id: 1`。端口 7890/7891/9090 与 `mixin.yaml` 的 `secret`、`socks-port` 覆盖保持不变。备份在 `/home/ubuntu/backups/mihomo-subswitch-20261102-154004/`。
