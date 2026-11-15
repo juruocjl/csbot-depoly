@@ -1,5 +1,10 @@
 # CSBot 服务器服务清单
 
+## 2026-11-15 Matrix 告警新增 Mihomo `:7890 -> matrix.org` 推送出口拨测
+
+- 在 `cjl` 授权下，于 `csbot` 后端 `scripts/health_alert.py`（每 60 秒 `csbot-health-alert.timer`）新增 `matrix_egress` 探针：经本机 Mihomo `http://127.0.0.1:7890` 请求 `https://matrix.org/_matrix/client/versions`（超时 8s，校验非空 `versions` 列表）。连续 2 次失败即通过本机回环 `http://127.0.0.1:6167`（不依赖 `:7890`）向 `csbot` Matrix 群发送 `CRITICAL` 告警唤醒 `@csbot` 切换 `Final/E-IX` 可用代理节点，防止同机 `tuwunel` 手机推送静默积压重试。
+- 后端 `/home/ubuntu/csbot` 从 `26b0190` 经 GitHub、`git pull --ff-only origin main` 快进至 `7ab23cbebd200d956764eeb36e3e28d3b7bea0f9`，同步安装至 `/usr/local/lib/csbot-health-alert.py`（`0755`）。本机与线上 `python3 checks/health_alert_test.py` 12/12 单测通过；2026-11-15 15:15:40（Asia/Shanghai）实测 `--dry-run` 返回 `issues={}`，`csbot-health-alert.service` 实跑 `Result=success, ExecMainStatus=0`，未重启 `csbot.service` 或任何容器。
+
 ## 2026-11-15 Steam Monitor 僵尸节点死锁与策略组自对齐修复
 
 - 在 `cjl` 授权下根治 `steam_monitor_js` 恢复探测卡死僵尸节点、动态候选 `*` 混入嵌套策略组及上游 `Steam` 策略组偏离问题。线上 `/home/ubuntu/steam_monitor_js` 从 `7dd4d95` 经 GitHub、`git pull --ff-only origin main` 更新至 `05dbb9dbfc4e9439558060ce49c84b28cb610d37`，并在发布前保留回滚镜像标签 `steam-monitor-js:rollback-20261115`。
