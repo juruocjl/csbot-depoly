@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-11-15 Steam Monitor 订阅主策略组自适应与信息提示假节点过滤升级
+
+- 解决换订阅后硬编码 `CLASH_FAILOVER_GROUP="E-IX"` 触发 `Clash API HTTP 404` 及订阅内流量/重置/到期/网址等假节点污染动态候选池问题：`steam_monitor_js` 默认启用 `CLASH_FAILOVER_GROUP="auto"` 与 `CLASH_UPSTREAM_GROUPS="Steam,Final"`，支持结合 `/proxies` 与 `/rules` 自动识别当前订阅主 `Selector`（若配置固定组名但不存在也自动回退，缺失上游组优雅跳过，切组自动重置冷却周期），动态枚举 `*` 自动过滤信息提示假节点，并在 `/api/health` 的 `clashFailover` 中暴露 `resolvedGroup`、`resolvedGroupSource`、`eligibleCandidateCount` 与 `filteredInfoNodes`。
+- 线上 `/home/ubuntu/steam_monitor_js` 从 `05dbb9dbfc4e9439558060ce49c84b28cb610d37` 经 GitHub、`git pull --ff-only origin main` 更新至 `8b58d90cb970e04890fcd71a481f8912a5e2839c`，发布前保留回滚镜像标签 `steam-monitor-js:rollback-20261115-pre-autogroup`。
+- 本机（Node `v24.12.0`）与线上（`/home/ubuntu/csbot/.tools/node/bin/node v22.23.4`）执行 `node --test` 均通过 `18/18` 单测；重建镜像 `sha256:942213bda89ac69d09197b67dc6bf6053adc3bdf433cd600a5a2a5bce189413d` 并重启容器 `steam_monitor`（`healthy`）。
+- 实测 `curl -fsS http://127.0.0.1:5555/api/health` 返回 `ok: true`、`loggedOn: true`、`friendStatusReady: true`、`reconnectStopped: false`、`clashFailover.group: "auto"`、`clashFailover.resolvedGroup: "悠兔"`、`clashFailover.resolvedGroupSource: "auto"`、`clashFailover.currentSelection: "高速隧道1x-新加坡-4"`、`clashFailover.eligibleCandidateCount: 43`、`clashFailover.filteredInfoNodes` 准确拦截 4 条信息假节点、`friendCount: 36`；`sudo -n python3 /usr/local/lib/csbot-health-alert.py --dry-run` 返回 `issues={}`（`disk_available_mib=8249`, `memory_available_mib=1344`），`mihomo.service`、`docker.service`、`csbot.service` 均为 `active`。
+
 ## 2026-11-15 Matrix 告警新增 Mihomo `:7890 -> matrix.org` 推送出口拨测
 
 - 在 `cjl` 授权下，于 `csbot` 后端 `scripts/health_alert.py`（每 60 秒 `csbot-health-alert.timer`）新增 `matrix_egress` 探针：经本机 Mihomo `http://127.0.0.1:7890` 请求 `https://matrix.org/_matrix/client/versions`（超时 8s，校验非空 `versions` 列表）。连续 2 次失败即通过本机回环 `http://127.0.0.1:6167`（不依赖 `:7890`）向 `csbot` Matrix 群发送 `CRITICAL` 告警唤醒 `@csbot` 切换 `Final/E-IX` 可用代理节点，防止同机 `tuwunel` 手机推送静默积压重试。

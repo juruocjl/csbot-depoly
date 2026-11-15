@@ -450,7 +450,7 @@ Compose 使用 host 网络访问宿主机上仅监听回环地址的 Clash SOCKS
 
 以下非 Mihomo 场景属于迁移说明，不应用于当前服务器的日常发布。默认代理地址为 `socks5://127.0.0.1:7891`。如果服务器没有本机 Clash/Mihomo，删除 `compose.yaml` 中的 `STEAM_SOCKS_PROXY`、`STEAM_WEB_COMPATIBILITY_MODE` 和 `network_mode`，恢复端口映射部署。
 
-连接类错误（如 `NoConnection`、`ServiceUnavailable`、TLS/WebSocket 断连与连接超时）发生时，服务会通过 Mihomo 控制接口测试候选节点，切换成功后再尝试登录。生产 `compose.yaml` 默认启用 `CLASH_FAILOVER_CANDIDATES=*` 与 `CLASH_UPSTREAM_GROUPS=Steam`：动态枚举会自动排除 `Auto`/`Fallback`/`Selector` 等嵌套策略组与 `DIRECT`/`REJECT` 虚拟节点，若上游 `Steam` 组偏离到单节点也会自动切回 `E-IX`；同时按实际登录失败维护跨恢复轮节点冷却黑名单（默认 30 分钟），结合 Web API 与 Steam CM `:443` 增强探测避免卡死在“HTTP 通但 CM 握手超时”的僵尸节点。短重试达到上限后不会退出或永久熔断，而是按 1、2、4、8、16、30、30... 分钟自动恢复；每轮先探测可用节点，探测失败时不会发送登录请求，探测成功才尝试一次登录。`RateLimitExceeded` 使用更保守的 1、2、4、6、6... 小时冷却后自动恢复。只有认证拒绝和 Steam Guard 会硬熔断。
+连接类错误（如 `NoConnection`、`ServiceUnavailable`、TLS/WebSocket 断连与连接超时）发生时，服务会通过 Mihomo 控制接口测试候选节点，切换成功后再尝试登录。生产 `compose.yaml` 默认启用 `CLASH_FAILOVER_GROUP=auto`、`CLASH_UPSTREAM_GROUPS=Steam,Final` 与 `CLASH_FAILOVER_CANDIDATES=*`：启动与每次探测时结合 `/proxies` 与 `/rules` 自动识别当前订阅承载流量的主 `Selector` 策略组（当配置了固定组名但在新订阅不存在时也会自动回退识别），动态枚举自动排除 `Auto`/`Fallback`/`Selector` 等嵌套策略组、`DIRECT`/`REJECT` 虚拟节点以及`剩余流量`/`套餐到期`/`下次重置`/`官网`等信息展示假节点；若上游存在的 `Steam`/`Final` 等策略组偏离到单节点也会自动切回当前解析的主策略组（不存在的上游组自动跳过）。同时按实际登录失败维护跨恢复轮节点冷却黑名单（默认 30 分钟），结合 Web API 与 Steam CM `:443` 增强探测避免卡死在“HTTP 通但 CM 握手超时”的僵尸节点。短重试达到上限后不会退出或永久熔断，而是按 1、2、4、8、16、30、30... 分钟自动恢复；每轮先探测可用节点，探测失败时不会发送登录请求，探测成功才尝试一次登录。`RateLimitExceeded` 使用更保守的 1、2、4、6、6... 小时冷却后自动恢复。只有认证拒绝和 Steam Guard 会硬熔断。
 
 容器会挂载宿主机的 `.env` 和 `data/`。程序登录成功后更新的 `STEAM_REFRESH_TOKEN` 会立即用于后续重连并写回宿主机 `.env`；容器进程重启时也会直接读取该文件中的最新 token。SQLite 历史会保存在宿主机 `data/friend_game_history.db`。
 
