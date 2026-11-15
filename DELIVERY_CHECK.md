@@ -1,5 +1,10 @@
 # 本地交付验收
 
+## 2026-11-15 Steam Monitor 故障转移与恢复探测根治
+
+- 修复 `steam_monitor_js` 三项缺陷：跨恢复轮记录真实 Steam 登录失败节点（冷却期跳过且在全部候选耗尽时保留跳过刚失败的当前节点轮换其它候选，消除“Web API 通但 CM TLS/WS 断连”死锁）；动态候选 `*` 基于 `/proxies` 元信息排除 `Selector`/`URLTest`/`Fallback`/`Relay`/`Direct`/`Reject` 等嵌套或虚拟节点并迁移离开非叶 `current`；探测/启动时自动对齐上游 `Selector` 策略组（默认 `Steam` -> `E-IX`），且支持 WebSocket CM `/cmsocket/` 探测与 `login-error` TLS/SOCKS/EPIPE 异常归类。
+- 本地 Windows（`npm test`）与线上 `cgserver` Linux（`node --test`）均实测 14/14 单元测试全绿，线上容器重建后 `/api/health` 实测 `ok: true`、`loggedOn: true`、`friendStatusReady: true`。
+
 ## 2026-11-02 赛程截图定时撤回
 
 - `/赛程`、`/我的赛程` 发图成功并取得有效回执后启动 90 秒计时，只撤回该回执的消息 ID。启动配置 `CS_SCHEDULE_AUTO_DELETE_SECONDS=0` 可关闭；错误/用法提示、用户指令和正常开赛/赛果通知保留。任务到期释放引用，撤回失败记录日志，后端重启不恢复尚未到期的任务。

@@ -1,5 +1,11 @@
 # CSBot 服务器服务清单
 
+## 2026-11-15 Steam Monitor 僵尸节点死锁与策略组自对齐修复
+
+- 在 `cjl` 授权下根治 `steam_monitor_js` 恢复探测卡死僵尸节点、动态候选 `*` 混入嵌套策略组及上游 `Steam` 策略组偏离问题。线上 `/home/ubuntu/steam_monitor_js` 从 `7dd4d95` 经 GitHub、`git pull --ff-only origin main` 更新至 `05dbb9dbfc4e9439558060ce49c84b28cb610d37`，并在发布前保留回滚镜像标签 `steam-monitor-js:rollback-20261115`。
+- 线上以 `/home/ubuntu/csbot/.tools/node/bin/node --test` 跑通 14/14 单测后，使用 `docker build --network=host`（经 `127.0.0.1:7890` 代理）构建镜像 `sha256:ef66485b0a21f95c856046af7691d1fa159900afa4c556e7cc431c1155f2f78e` 并重建容器 `steam_monitor`（2026-11-15 15:00:22 Asia/Shanghai 启动，`healthy`）。
+- 实测 `curl -fsS http://127.0.0.1:5555/api/health` 返回 `ok: true`、`loggedOn: true`、`friendStatusReady: true`、`clashFailover.upstreamGroups: ["Steam"]`、`cmProbeEnabled: true`、`friendCount: 36`；`mihomo.service`、`docker.service`、`csbot.service` 均为 `active`，`csbot` 全套容器在线。
+
 ## 2026-11-02 赛程截图定时撤回发布（11-03 验收）
 
 - 用户授权修改并部署 `/赛程`、`/我的赛程` 的截图撤回。后端从 `5348641714fefeed6f8e0bb07026b29f2907bb26` 经 GitHub、`pull --ff-only` 更新到 `21b4a03fe6a3d8d0869a117c580f92a091d1dc98`；2026-11-02 23:43:25（Asia/Shanghai）恢复服务，MainPID `956764`、NRestarts=0、active。生产实际配置为默认 90 秒，插件加载和 OneBot 连接成功。
