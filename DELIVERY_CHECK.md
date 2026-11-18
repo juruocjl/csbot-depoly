@@ -1,5 +1,11 @@
 # 本地交付验收
 
+## 2026-11-18 OpenAI 全链路 `usage` 计费账本与 Tailnet 只读增量接口上线验收
+
+- **`csbot`（`b85387a6f96522bfb7292085c7e4d1eece11cbb5`）**：新增无非标库依赖的 `ai_runtime/usage.py` 与 `checks/ai_usage_test.py`，并在 `store.py`（`ai_usage` 只追加表与 `list_usage_after` / `run_usage_summary`）、`dsh/bridge.mjs`（`tapUsage` 覆盖 `chat` / `memory_extract` / `memory_verify` / `compaction`）、`openai_support.py` & `runner.py`（`image_gen` / `image_edit`）、`plugins/cs_ai/__init__.py`（`output_guard` `/v1/responses` & `/v1/chat/completions`）及 `plugins/cs_server/__init__.py`（`GET /api/internal/ai-usage` 双层内网守卫与 `/api/ai/events` 单轮汇总）打通全链路计费。本机 Windows 与线上 Linux 执行 `checks/ai_usage_test.py` 27/27、`checks/openai_runtime_test.py` 20/20、`checks/health_alert_test.py` 13/13、`checks/output_guard_logic_test.py` 7/7、`checks/runtime_config_logic_test.py` 15/15，线上 Linux 另执行 `check_ai_boundaries.py` 4/4、`check_ai_source.py` 2/2、`check_dsh_runtime.py` 14/14、`check_ai_web.py` 与服务身份 `check_ai_sandbox.py`、`ai_preflight.py` 全部通过。
+- **`csbot-front`（源码 `b3cf6dbb38759698506e3c1ee3bc32965d7076b3` -> [Actions 44294314265](https://github.com/juruocjl/csbot-front/actions/runs/44294314265) -> `build-output` `0fd1b019ba3e6bccc56a504a21bca6b6b27c1943`）**：`aiTrace.ts` 与 `AIChat.vue` 新增单轮 Token、缓存命中率与折算美元展示，`node --test checks/*.test.mjs` 18/18 与 `npm run build` 通过。
+- **跨网隔离与端到端实测**：Windows 本机直连 Tailnet `http://100.101.30.74:8888/api/internal/ai-usage` 实测 HTTP `200` 拉取真实计费记录与游标翻页；公网 `https://cs.ave-mujica.top/api/internal/ai-usage` 实测拦截返回 HTTP `403`、公网 `:8888` 被防火墙丢弃超时；线上隔离状态目录真实 OpenAI 端到端运行（`06588af2-0878-4537-af38-25c3971f88b2`）完整落库 `chat`、`image_gen`、`output_guard`、`memory_extract` 全部场景，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-18 `gpt-image-2.6-sunburst` 图生图（`/v1/images/edits`）与跨轮连续改图上线验收
 
 - **前置接口拨测**：经服务端 `http://127.0.0.1:7890` 对 `POST https://api.openai.com/v1/images/edits`（`model="gpt-image-2.6-sunburst"`）做无密钥回显最小实测，确认单图 `image` 与多图 `image[]` 均返回 HTTP `200` 及 `b64_json` PNG，且确认该模型不支持 `input_fidelity` 参数（返回 `invalid_input_fidelity_model`），实现中已明确排除该字段。

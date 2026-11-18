@@ -141,6 +141,9 @@ PIP_INDEX_URL 可省略，默认官方源；验收机官方包下载很慢，清
 | CS_AI_STATE_DIR | `/home/ubuntu/csbot/data/ai`，目录 0700、状态库 0600。 |
 | CS_AI_GAME_DB | `/home/ubuntu/steam_monitor_js/data/friend_game_history.db`，后端须能只读打开其 WAL 数据。 |
 | CS_IMAGE_FULL_BUDGET_BYTES | 1073741824。缩略图无清理配置。 |
+| CS_AI_PRICE_GPT62_SOL_INPUT / CACHED / CACHE_WRITE / OUTPUT | `gpt-6.2-sol` 默认单价 `2.0 / 0.10 / 2.50 / 10.0`（USD / 1M tokens；总输入 `>272,000` 自动按输入与缓存 `2x`、输出 `1.5x` 计价）。 |
+| CS_AI_PRICE_IMAGE_TEXT_INPUT / CACHED_TEXT_INPUT / INPUT / CACHED_INPUT / OUTPUT | `gpt-image-2.6-sunburst` 默认单价 `5.0 / 1.25 / 8.0 / 2.0 / 30.0`（USD / 1M tokens）。 |
+| CS_AI_MODEL_PRICING_JSON | 可选文本模型单价覆盖 JSON（按模型名小写匹配 `input`/`cached`/`cache_write`/`output`/`long_context_threshold`）。 |
 
 模板 [ai.conf](csbot/deploy/systemd/csbot.service.d/ai.conf) 设置专用 Node PATH、数据路径和仅后端服务的 SupplementaryGroups=docker。可信后端有 Docker 控制权；这不是把控制权赋予 agent。保留既有 csbot.service 入口及 memory.conf，不覆盖整个 unit。安装模板、daemon-reload 和 restart 属于实际发布操作，须在发布授权后进行。
 
@@ -374,3 +377,9 @@ AI 对话页新增按需展开的“本轮提供给模型的上下文”，与�
 分数趋势 metadata 另存明确的QQ、SteamID、游戏昵称；队友卡片来源保留统计主体的SteamID，避免被最后一位队友覆盖。发言统计已有逐人QQ字段，其他新数据卡片/网页 metadata 已有 SteamID 或QQ，不依赖昵称字符串解析。市场报价和全群词云无需把物品名/词语当作成员。
 
 2026-10-06已按用户授权发布完整metadata、成员身份和本轮上下文展示，线上版本与回退备份见 [服务清单](SERVER_SERVICES.md#2026-10-06-完整-metadata成员身份与本轮上下文发布)。
+
+## 全链路 OpenAI `usage` 账本与 Tailnet 增量接口（2026-11-18）
+
+- 运维 SQLite `data/ai/state.sqlite3` 新增只追加表 `ai_usage`（自增主键 `id INTEGER PRIMARY KEY AUTOINCREMENT`），记录 `chat`、`memory_extract`、`memory_verify`、`compaction`、`image_gen`、`image_edit`、`output_guard` 七类场景的 Token 明细（恒满足 `input_tokens == uncached_input_tokens + cached_tokens + cache_write_tokens`）、`cost_usd`、`nocache_cost_usd` 及图像规格 `size`/`quality`，不存储请求正文、群消息或任何密钥。
+- `POST /api/ai/events` 在 `ready`/`done` 与实时 `usage` 事件中附带当前 `run_id` 的汇总（`run_usage_summary`），供 `/ai-chat` 网页展示本轮 Token、缓存命中率与折算费用。
+- `GET /api/internal/ai-usage?after_id=0&limit=500`（`1 <= limit <= 2000`）仅供本机回环（`127.0.0.0/8`、`::1`）与 Tailnet（`100.64.0.0/10`、`fd7a:115c:a1e0::/48`）直连只读拉取：凡携带 `X-Forwarded-*` / `X-Real-IP` / `Forwarded` 等转发头或源 IP 非回环/Tailnet（如 `csbot-homepage` Docker 网桥 `172.18.0.x` 与公网地址）一律拒绝 `403`。
