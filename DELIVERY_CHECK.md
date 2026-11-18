@@ -1,5 +1,11 @@
 # 本地交付验收
 
+## 2026-11-18 PGL 新加坡 Major 2026 Stage 1 作业与全赛事队标上线验收
+
+- 依据 `https://majors.im/2026/singapore`、Valve 官方 2026-11-02 Major 截止 VRS 积分、HLTV 2026-11-16 世界排名积分与 5E 赛事 `9303`/`9304`/`8302` 实测队名，新增 `assets/2026-singapore-stage1.json`（16 队）及 `stage2.invites.json`、`stage3.invites.json`（全 BO3）；统一 `major_hw`、`gen_win_matrix`、`simulate` 与 `recalculate_major_stage_results` 的四级队名解析（精确 -> 大小写无关 -> 去标点紧凑短码 -> 模糊兜底，兼容 `PVISION`/`GOSH`/`THE ONE`/`BB Team` 等合规替用名与 `ef`/`cw`/`pv` 等短码）；新增跨阶段陈旧 `result.txt` 队伍集合校验防 `KeyError`；`cs_server` 按 `major_name` 动态映射 `/team-icons/2026-singapore/*.png` 并保留 `2026-cologne` 兼容。
+- 本机与线上 Linux 执行 `checks/major_hw_singapore_test.py` 13/13、`checks/hltv_watcher_logic_test.py` 17/17、`checks/runtime_config_logic_test.py` 15/15、线上 LF 检出 `scripts/check_ai_source.py` 2/2 全部通过；测试库 `csbot_backup` 独立回滚事务验证 `major_hw`、`major_hw_snapshots`、`major_simulation_snapshots` 读写与回滚零残留；前端 `node --test checks/*.test.mjs` 14/14 与 `npm run build` 构建通过。
+- 后端提交 `9c85eb7d242873e00b065d358dd5af67477b78cf`、前端源码 `db235aaf6e1934be937c5234a0fce83848daab3b`（[Actions 44232034763](https://github.com/juruocjl/csbot-front/actions/runs/44232034763) -> 产物 `5a16916efea9ac493bda3f1bbc9c3272459e104f`）已按 Git 快进发布生产并完成 API、HTTPS 静态资源、Pyppeteer 截图与健康监控验收，详情见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-15 Steam Monitor 故障转移与恢复探测根治
 
 - 修复 `steam_monitor_js` 三项缺陷：跨恢复轮记录真实 Steam 登录失败节点（冷却期跳过且在全部候选耗尽时保留跳过刚失败的当前节点轮换其它候选，消除“Web API 通但 CM TLS/WS 断连”死锁）；动态候选 `*` 基于 `/proxies` 元信息排除 `Selector`/`URLTest`/`Fallback`/`Relay`/`Direct`/`Reject` 等嵌套或虚拟节点并迁移离开非叶 `current`；探测/启动时自动对齐上游 `Selector` 策略组（默认 `Steam` -> `E-IX`），且支持 WebSocket CM `/cmsocket/` 探测与 `login-error` TLS/SOCKS/EPIPE 异常归类。
