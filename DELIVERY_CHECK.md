@@ -1,5 +1,11 @@
 # 本地交付验收
 
+## 2026-11-18 `gpt-image-2.6-sunburst` 图生图（`/v1/images/edits`）与跨轮连续改图上线验收
+
+- **前置接口拨测**：经服务端 `http://127.0.0.1:7890` 对 `POST https://api.openai.com/v1/images/edits`（`model="gpt-image-2.6-sunburst"`）做无密钥回显最小实测，确认单图 `image` 与多图 `image[]` 均返回 HTTP `200` 及 `b64_json` PNG，且确认该模型不支持 `input_fidelity` 参数（返回 `invalid_input_fidelity_model`），实现中已明确排除该字段。
+- **`csbot`（`02260dc7422aef160bc4ce5812d1bc37ec82758c`）**：扩充 `ai_runtime/openai_support.py`、`runner.py`、`service.py`、`dsh/bridge.mjs` 与 `DATA.md`，为原生 `generate_image` 新增可选 `image_paths`（1–8 张参考图走 `/v1/images/edits`，未传或空数组走 `/v1/images/generations`）；支持 `PNG`/`JPEG`/`WEBP` 真实魔数 MIME 直传、QQ 群聊 `GIF` 动图自动取首帧转 `RGBA` PNG 及超 `2048px`/`8 MiB` 大图缩放重编码；建立独立于业务源码快照的 `authorized_image_paths` 双层白名单（Node `bridge.mjs` 守卫 + 宿主 Python `resolve_authorized_image_paths` 默认拒绝空集、拦截工作区符号链接、拒绝 URL 并引导 `member_avatar`/`csdata.image`、Pillow 二次图像校验），并通过 `recent_scope_image_paths` 按 `scope` 严格隔离预授权同会话最近 8 张生成图支持跨轮“把刚画的图再改一下”。本机 Windows 与线上 Linux 执行 `checks/openai_runtime_test.py` 20/20、`checks/health_alert_test.py` 13/13、`checks/runtime_config_logic_test.py` 15/15，线上 Linux 另执行 `check_ai_boundaries.py` 4/4、`check_ai_source.py` 2/2、`check_dsh_runtime.py` 14/14、`check_ai_web.py` 与服务身份 `check_ai_sandbox.py`、`ai_preflight.py` 全部通过。
+- **`csbot-front`（源码 `b57e461a67a61a8008b4c67bed18521b6988395a` -> [Actions 44286722292](https://github.com/juruocjl/csbot-front/actions/runs/44286722292) -> `build-output` `28014edbbe3b73c89dc2fe08bb5868784eb67e28`）**：`toolDisplayLabel` 在 `generate_image` 携带非空 `image_paths` 时展示“生成图片（参考改图）”，纯文生图保持“生成图片”；`node --test checks/*.test.mjs` 16/16 与 `npm run build` 通过。线上服务身份临时隔离目录两轮真实端到端验收（群友头像 + 历史 `.png` 名存 JPEG 聊天图双图融合 -> 第二轮跨轮复用生成图加金星，零骚扰真实 QQ 群）全部通过，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-18 OpenAI `gpt-6.2-sol`、`gpt-image-2.6-sunburst` 画图与稳定节点拨测验收
 
 - **`steam_monitor_js`（`4c29ee42b4e63f52768e400fc2060b580c0de162`）**：新增香港节点正则排除（`CLASH_EXCLUDE_NODE_PATTERN`，不误伤非香港节点）、节点倍率解析与低倍率优先排序（`1x` -> 未标注倍率 -> `2.5x`），以及 `openai`（`expected=401` 连测 2 次）+ `matrix`（`expected=200-299`）附加出口探活（全部候选未过附加探针时安全降级回退至 Steam 可达节点池防失联），启动若当前节点命排除规则自动迁移至稳定节点。本机 Windows（Node `v24.12.0`）与线上 Linux（Node `v22.23.4`）执行 `node --test` 均通过 `21/21` 单测。

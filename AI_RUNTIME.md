@@ -55,7 +55,7 @@ mid、record_id、block_id 等仍保留在内部资料中用于准确查询、�
 
 ## 查询和脚本边界
 
-模型看到 `read`、`read_image`、`execute_python` 和 Mneme 的保存/检索/忘记工具；OpenAI 端点下另启用原生 `generate_image`（`gpt-image-2.6-sunburst` 创意生图，每轮与脚本发图共享最多 4 张配额）；已配置官方或独立搜索端点（`CS_AI_SEARCH_URL` / `CS_AI_SEARCH_API_KEY`）时另启用 DSH 原生 `web_search`、`web_fetch`，并可选择 `web_fetch_proxy` 通过预设本地代理读取公网网页（配置与限额见文末）。文件访问只允许本会话工作目录、服务端确认属于当前群的图片路径，以及本轮已审查业务源码快照中的明确文件，按 realpath 校验；不开放宿主 shell、写文件工具、子进程工具或任意插件安装。
+模型看到 `read`、`read_image`、`execute_python` 和 Mneme 的保存/检索/忘记工具；OpenAI 端点下另启用原生 `generate_image`（`gpt-image-2.6-sunburst` 创意文生图与参考图改图/多图合成，每轮与脚本发图共享最多 4 张配额）；已配置官方或独立搜索端点（`CS_AI_SEARCH_URL` / `CS_AI_SEARCH_API_KEY`）时另启用 DSH 原生 `web_search`、`web_fetch`，并可选择 `web_fetch_proxy` 通过预设本地代理读取公网网页（配置与限额见文末）。文件访问只允许本会话工作目录、服务端确认属于当前群的图片路径，以及本轮已审查业务源码快照中的明确文件，按 realpath 校验；`generate_image` 的可选 `image_paths`（最多 8 张）进一步限制在独立授权图片集（本轮/同会话近期生成图、经 `csdata.image(id)` 授权的群聊图片或 `readable_image_view` 视图、经 `csdata.call('member_avatar', uid=...)` 授权的本群成员头像及本轮图像产物），默认拒绝空集、符号链接、URL 和源码/普通文本文件，不开放宿主 shell、写文件工具、子进程工具或任意插件安装。
 
 脚本通过 `csdata.call()` 调用预写 SQL，也可以 `csdata.query()` 自写查询；两者走同一个授权编译器。`catalog()` 和工作目录的 DATA.md 给出表、字段、参数、查询样例及统计语义。`search/block/image/status` 也是脚本 SDK 的方法，不额外扩展模型工具列表。
 

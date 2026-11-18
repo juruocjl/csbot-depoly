@@ -1,5 +1,15 @@
 # CSBot 服务器服务清单
 
+## 2026-11-18 `gpt-image-2.6-sunburst` 图生图（`/v1/images/edits`）与跨轮连续改图上线
+
+- 按 `cjl` 授权完成线上 `/v1/images/edits` 可用性实测与 `generate_image` 参考图改图/多图融合三端闭环上线：
+  1. **前置接口实测结论**：经本机 `http://127.0.0.1:7890`（`高速隧道1x-日本-2`）实测 `POST https://api.openai.com/v1/images/edits`（`model="gpt-image-2.6-sunburst"`），单图 `image` 与多图 `image[]`（`image/png` + `image/jpeg`）均返回 HTTP `200` 及 `b64_json` PNG；确认该模型不支持 `input_fidelity`（HTTP `400` `invalid_input_fidelity_model`），实现中未传该字段。
+  2. **代码与前端产物快进更新**：后端 `/home/ubuntu/csbot` 从 `a1232b5464a67c65649afcdbd9b41a682259bac5` 快进至 `02260dc7422aef160bc4ce5812d1bc37ec82758c`（保留既有未提交 `assets/edge/homepage.conf` 未触碰）；前端 `csbot-front` 源码从 `9cf7a3740fd9e50aba217700a624b7bc293c1768` 更新至 `b57e461a67a61a8008b4c67bed18521b6988395a`（[Actions 44286722292](https://github.com/juruocjl/csbot-front/actions/runs/44286722292) -> `/home/ubuntu/csbot/dist` 从 `f3b7bebc27f4dc57a9b082f2e5c706962e1352bc` 快进至 `28014edbbe3b73c89dc2fe08bb5868784eb67e28`）。
+  3. **白名单安全边界与跨轮连续改图**：在 Node `bridge.mjs` 与宿主 `runner.py`/`openai_support.py` 双层校验独立授权图片集 `authorized_image_paths`（Fail-Closed 默认拒绝空集、拒绝工作区符号链接、拒绝 URL 与非图像文件，仅放行本轮 `read_paths`、`csdata.image(id)`、`csdata.call('member_avatar', uid=...)` 及本轮生成图）；兼容历史 `.png` 后缀下的 JPEG 字节、`GIF` 首帧转 PNG 与超 `2048px`/`8 MiB` 大图缩放；`service.py` 通过 `recent_scope_image_paths` 按 `scope` 严格隔离预授权最近 8 张存活生成图，支持群聊与网页连续多轮改图。
+- 发布前确认 AI 运行/排队与待发 outbox 均为 0，先暂停 `csbot-memory-guard.timer` 与 `csbot-health-alert.timer` 再停 `csbot.service`，于私有备份目录 `/home/ubuntu/backups/imgedit-20261118-183626-65447b/`（`0700`）保存三端原 HEAD、`.env.prod.bak`（`0600`）、`state-before.sqlite3`（810 条记录，`integrity_check=ok`）及 `media-cache-before.sqlite3`（14,285 条记录，`integrity_check=ok`）。
+- 线上通过 `checks/openai_runtime_test.py` 20/20、`check_ai_boundaries.py` 4/4、`check_ai_source.py` 2/2、`check_dsh_runtime.py` 14/14、`check_ai_web.py` 与服务身份 `check_ai_sandbox.py`、`ai_preflight.py` 后，于 2026-11-18 18:37:46（Asia/Shanghai）恢复 `csbot.service` 及两项守护 timer：`MainPID=251698`、`NRestarts=0`、`active`，两项 timer 均 `active`（自然触发 `csbot-health-alert.service` `Result=success, ExecMainStatus=0`），`csbot-health-alert.py --dry-run` 返回 `issues={}`（`disk_available_mib=7259`, `memory_available_mib=1447`），`:5555/api/health` 三项就绪 `true`（`currentSelection="高速隧道1x-日本-2"`），公网 HTTPS `/ai-chat` 与新前端资源 `/assets/index-IvLPmWFv.js` 均返回 HTTP `200`，匿名 `/api/admin/runtime-config` 返回 `401`。
+- 服务身份下在临时隔离状态目录执行两轮真实端到端验收（零骚扰真实 QQ 群、生产状态库零测试记录污染）：第 1 轮（`1e9a5b32-eea7-47cd-b05c-ac1f9c62cd5d`）`gpt-6.2-sol` 自动调 `member_avatar` 与 `csdata.image`（`.png` 名存 JPEG 经 `readable_image_view` 转 `.jpg`）并调 `generate_image`（`mode="edit"`, `reference_count=2`）经 `/v1/images/edits` 合成 `1024x1024` PNG（`875,173` 字节，缩略图 `63,687` 字节）；第 2 轮（`762de2d8-704d-41ef-a633-b1fa69fc14cd`, `resumed=true`）模型直接复用同 `scope` 预授权的第 1 轮持久化 `file_path` 调 `generate_image`（`mode="edit"`, `reference_count=1`）成功在右上角加金星生成 `1024x1024` PNG（`1,083,346` 字节，缩略图 `70,172` 字节），两轮 OpenAI `/v1/responses` QQ 输出审查均为 `allow` 且 Mneme 提炼正常完成。
+
 ## 2026-11-18 OpenAI `gpt-6.2-sol` 默认切换、`gpt-image-2.6-sunburst` 画图工具与稳定节点拨测上线
 
 - 按 `cjl` 一步到位授权完成四项改造并发布生产：
