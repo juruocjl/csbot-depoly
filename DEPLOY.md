@@ -202,6 +202,7 @@ Matrix 投递参数存于服务器私有文件 `/etc/csbot-health-alert.json`（
 | 已发消息归档积压 | 最老 ≥30 分钟 | 最老 ≥2 小时 |
 | Steam 就绪（`:5555/api/health`） | 自动重连中（attempt < 3） | 连续重连未恢复（attempt/failures ≥ 3）或停止重连（立即） |
 | Mihomo `:7890 -> matrix.org` | — | `/_matrix/client/versions` 连续 2 次不通或响应异常（保护 Tuwunel 推送出口） |
+| Mihomo `:7890 -> api.openai.com` | — | `/v1/models` 匿名拨测连续 2 次 TLS 握手重置/超时/非预期 `401` JSON（保护 OpenAI 对话与生图出口） |
 
 另外检查 `csbot`、`mihomo`、`docker`、内存守护 timer，数据库/NapCat/Steam/两处 Nginx 容器、PostgreSQL 接收连接、后端 HTTP 响应、NapCat QQ 在线状态，以及一次采样间隔内至少两次的后端自动重启。归档仅只读统计，不重发群消息或修改 outbox。
 
@@ -450,7 +451,7 @@ Compose 使用 host 网络访问宿主机上仅监听回环地址的 Clash SOCKS
 
 以下非 Mihomo 场景属于迁移说明，不应用于当前服务器的日常发布。默认代理地址为 `socks5://127.0.0.1:7891`。如果服务器没有本机 Clash/Mihomo，删除 `compose.yaml` 中的 `STEAM_SOCKS_PROXY`、`STEAM_WEB_COMPATIBILITY_MODE` 和 `network_mode`，恢复端口映射部署。
 
-连接类错误（如 `NoConnection`、`ServiceUnavailable`、TLS/WebSocket 断连与连接超时）发生时，服务会通过 Mihomo 控制接口测试候选节点，切换成功后再尝试登录。生产 `compose.yaml` 默认启用 `CLASH_FAILOVER_GROUP=auto`、`CLASH_UPSTREAM_GROUPS=Steam,Final` 与 `CLASH_FAILOVER_CANDIDATES=*`：启动与每次探测时结合 `/proxies` 与 `/rules` 自动识别当前订阅承载流量的主 `Selector` 策略组（当配置了固定组名但在新订阅不存在时也会自动回退识别），动态枚举自动排除 `Auto`/`Fallback`/`Selector` 等嵌套策略组、`DIRECT`/`REJECT` 虚拟节点以及`剩余流量`/`套餐到期`/`下次重置`/`官网`等信息展示假节点；若上游存在的 `Steam`/`Final` 等策略组偏离到单节点也会自动切回当前解析的主策略组（不存在的上游组自动跳过）。同时按实际登录失败维护跨恢复轮节点冷却黑名单（默认 30 分钟），结合 Web API 与 Steam CM `:443` 增强探测避免卡死在“HTTP 通但 CM 握手超时”的僵尸节点。短重试达到上限后不会退出或永久熔断，而是按 1、2、4、8、16、30、30... 分钟自动恢复；每轮先探测可用节点，探测失败时不会发送登录请求，探测成功才尝试一次登录。`RateLimitExceeded` 使用更保守的 1、2、4、6、6... 小时冷却后自动恢复。只有认证拒绝和 Steam Guard 会硬熔断。
+连接类错误（如 `NoConnection`、`ServiceUnavailable`、TLS/WebSocket 断连与连接超时）发生时，服务会通过 Mihomo 控制接口测试候选节点，切换成功后再尝试登录。生产 `compose.yaml` 默认启用 `CLASH_FAILOVER_GROUP=auto`、`CLASH_UPSTREAM_GROUPS=Steam,Final,OpenAI,AI,ChatGPT`、`CLASH_FAILOVER_CANDIDATES=*`、`CLASH_EXCLUDE_NODE_PATTERN`（默认排除香港抖动节点）、`CLASH_PREFER_LOW_MULTIPLIER=true`（优先 `1x` 低倍率节点，`2.5x` 兜底）以及 `CLASH_OPENAI_TEST_URL`（预期 `401` 连测 2 次）与 `CLASH_MATRIX_TEST_URL` 附加探活：启动与每次探测时结合 `/proxies` 与 `/rules` 自动识别当前订阅承载流量的主 `Selector` 策略组（当配置了固定组名但在新订阅不存在时也会自动回退识别；启动若当前停在被排除的香港节点则主动迁移至稳定节点），动态枚举自动排除嵌套策略组、`DIRECT`/`REJECT` 虚拟节点、信息展示假节点及香港出口；若上游存在的 `Steam`/`Final`/`OpenAI` 等策略组偏离到单节点也会自动切回当前解析的主策略组（不存在的上游组自动跳过）。同时按实际登录失败维护跨恢复轮节点冷却黑名单（默认 30 分钟），结合 Steam Web API、Steam CM `:443`、OpenAI `/v1/models` 与 Matrix `/_matrix/client/versions` 四重探测确保切换后的节点对三端流量均稳定可用（若极端情况下所有候选均未通过附加探针，则安全回退至 Steam 可达节点池防失联）。短重试达到上限后不会退出或永久熔断，而是按 1、2、4、8、16、30、30... 分钟自动恢复；每轮先探测可用节点，探测失败时不会发送登录请求，探测成功才尝试一次登录。`RateLimitExceeded` 使用更保守的 1、2、4、6、6... 小时冷却后自动恢复。只有认证拒绝和 Steam Guard 会硬熔断。
 
 容器会挂载宿主机的 `.env` 和 `data/`。程序登录成功后更新的 `STEAM_REFRESH_TOKEN` 会立即用于后续重连并写回宿主机 `.env`；容器进程重启时也会直接读取该文件中的最新 token。SQLite 历史会保存在宿主机 `data/friend_game_history.db`。
 

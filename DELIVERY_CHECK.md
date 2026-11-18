@@ -1,5 +1,11 @@
 # 本地交付验收
 
+## 2026-11-18 OpenAI `gpt-6.2-sol`、`gpt-image-2.6-sunburst` 画图与稳定节点拨测验收
+
+- **`steam_monitor_js`（`4c29ee42b4e63f52768e400fc2060b580c0de162`）**：新增香港节点正则排除（`CLASH_EXCLUDE_NODE_PATTERN`，不误伤非香港节点）、节点倍率解析与低倍率优先排序（`1x` -> 未标注倍率 -> `2.5x`），以及 `openai`（`expected=401` 连测 2 次）+ `matrix`（`expected=200-299`）附加出口探活（全部候选未过附加探针时安全降级回退至 Steam 可达节点池防失联），启动若当前节点命排除规则自动迁移至稳定节点。本机 Windows（Node `v24.12.0`）与线上 Linux（Node `v22.23.4`）执行 `node --test` 均通过 `21/21` 单测。
+- **`csbot`（`a1232b5464a67c65649afcdbd9b41a682259bac5`）**：`scripts/health_alert.py` 新增 `openai_egress`（`:7890 -> https://api.openai.com/v1/models` 匿名校验 TLS 与 `401` OpenAI JSON，`CRITICAL` 连续 2 次触发，Python 3.10 兼容）；`ai_runtime` 新增 `openai_support.py` 并扩展 `runner.py` / `dsh/bridge.mjs` / `service.py` / `plugins/cs_ai` 支持 OpenAI `gpt-6.2-sol`（`openai-responses`、`off -> low` 推理档位映射、按 `CSBOT_LLM_PROXY_HOST` 精准局部代理 `:7890`、独立 `CS_AI_SEARCH_URL` / `CS_AI_SEARCH_API_KEY` 保活联网搜索、OpenAI `/v1/responses` QQ 输出审查）与原生 `generate_image` 工具（`gpt-image-2.6-sunburst`，PNG 解码校验、瞬断退避重试、每轮 4 张上限）。本机与线上 Linux 执行 `checks/health_alert_test.py` 13/13、`checks/runtime_config_logic_test.py` 15/15、`checks/openai_runtime_test.py` 9/9，线上 Linux 另执行 `check_ai_boundaries.py` 4/4、`check_ai_source.py` 2/2、`check_dsh_runtime.py` 全量 14 项协议/记忆/审查/压缩回归、`check_ai_web.py` 与服务身份 `check_ai_sandbox.py`、`ai_preflight.py` 全部通过。
+- **`csbot-front`（`9cf7a3740fd9e50aba217700a624b7bc293c1768` -> `build-output` `f3b7bebc27f4dc57a9b082f2e5c706962e1352bc`）**：`toolDisplayLabel('generate_image')` 映射为“生成图片”并同步后台模型说明，`node --test checks/*.test.mjs` 15/15 与 `npm run build` 通过。线上公网 HTTPS、受保护配置接口及临时隔离目录真实 `gpt-6.2-sol` 对话 + `gpt-image-2.6-sunburst` 生图 + `/v1/responses` QQ 风控审查 + Mneme 提炼端到端验收全部通过，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-18 PGL 新加坡 Major 2026 Stage 1 作业与全赛事队标上线验收
 
 - 依据 `https://majors.im/2026/singapore`、Valve 官方 2026-11-02 Major 截止 VRS 积分、HLTV 2026-11-16 世界排名积分与 5E 赛事 `9303`/`9304`/`8302` 实测队名，新增 `assets/2026-singapore-stage1.json`（16 队）及 `stage2.invites.json`、`stage3.invites.json`（全 BO3）；统一 `major_hw`、`gen_win_matrix`、`simulate` 与 `recalculate_major_stage_results` 的四级队名解析（精确 -> 大小写无关 -> 去标点紧凑短码 -> 模糊兜底，兼容 `PVISION`/`GOSH`/`THE ONE`/`BB Team` 等合规替用名与 `ef`/`cw`/`pv` 等短码）；新增跨阶段陈旧 `result.txt` 队伍集合校验防 `KeyError`；`cs_server` 按 `major_name` 动态映射 `/team-icons/2026-singapore/*.png` 并保留 `2026-cologne` 兼容。

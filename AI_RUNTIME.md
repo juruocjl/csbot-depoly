@@ -55,7 +55,7 @@ mid、record_id、block_id 等仍保留在内部资料中用于准确查询、�
 
 ## 查询和脚本边界
 
-模型看到 `read`、`read_image`、`execute_python` 和 Mneme 的保存/检索/忘记工具；已配置官方或独立搜索端点时另启用 DSH 原生 `web_search`、`web_fetch`，并可选择 `web_fetch_proxy` 通过预设本地代理读取公网网页（配置与限额见文末）。文件访问只允许本会话工作目录、服务端确认属于当前群的图片路径，以及本轮已审查业务源码快照中的明确文件，按 realpath 校验；不开放宿主 shell、写文件工具、子进程工具或任意插件安装。
+模型看到 `read`、`read_image`、`execute_python` 和 Mneme 的保存/检索/忘记工具；OpenAI 端点下另启用原生 `generate_image`（`gpt-image-2.6-sunburst` 创意生图，每轮与脚本发图共享最多 4 张配额）；已配置官方或独立搜索端点（`CS_AI_SEARCH_URL` / `CS_AI_SEARCH_API_KEY`）时另启用 DSH 原生 `web_search`、`web_fetch`，并可选择 `web_fetch_proxy` 通过预设本地代理读取公网网页（配置与限额见文末）。文件访问只允许本会话工作目录、服务端确认属于当前群的图片路径，以及本轮已审查业务源码快照中的明确文件，按 realpath 校验；不开放宿主 shell、写文件工具、子进程工具或任意插件安装。
 
 脚本通过 `csdata.call()` 调用预写 SQL，也可以 `csdata.query()` 自写查询；两者走同一个授权编译器。`catalog()` 和工作目录的 DATA.md 给出表、字段、参数、查询样例及统计语义。`search/block/image/status` 也是脚本 SDK 的方法，不额外扩展模型工具列表。
 
@@ -131,10 +131,13 @@ PIP_INDEX_URL 可省略，默认官方源；验收机官方包下载很慢，清
 | 配置 | 值/含义 |
 | --- | --- |
 | CS_AI_ENGINE | 仅 dsh；旧引擎及旧记忆读写已移除，legacy 不再可用。 |
-| CS_AI_URL / CS_AI_API_KEY | 沿用既有模型接口；从安全配置读取，禁止写入 Git/文档。 |
-| cs_ai_model | 仍从数据库动态配置读取，不用旧环境值覆盖已保存选择。 |
+| CS_AI_URL / CS_AI_API_KEY | 模型主接口（当前生产使用 OpenAI `https://api.openai.com/v1`）；从安全配置读取，禁止写入 Git/文档。 |
+| cs_ai_model | 从数据库动态配置读取（当前生产默认与已存值均为 `gpt-6.2-sol`，保留切换 DeepSeek 等模型兼容）。 |
+| CS_AI_OPENAI_PROXY_URL | 默认 `http://127.0.0.1:7890`；仅在 OpenAI 端点下对该域名启用回环 HTTP 代理，不影响公网直连抓取。 |
+| CS_AI_IMAGE_MODEL | 默认 `gpt-image-2.6-sunburst`，供 `generate_image` 原生画图工具调用。 |
+| CS_AI_SEARCH_URL / CS_AI_SEARCH_API_KEY | 独立联网搜索 Messages 端点与密钥，主模型切至 OpenAI 后保留原 DeepSeek 搜索通路。 |
 | CS_AI_VISION | 默认 true；模型不支持图片时显式 false，不能假装看到了图片。 |
-| CS_AI_CONTEXT_WINDOW | 默认 65536，不应大于服务商实际容量。 |
+| CS_AI_CONTEXT_WINDOW | OpenAI 默认 131072，DeepSeek 默认 65536；不应大于服务商实际容量。 |
 | CS_AI_STATE_DIR | `/home/ubuntu/csbot/data/ai`，目录 0700、状态库 0600。 |
 | CS_AI_GAME_DB | `/home/ubuntu/steam_monitor_js/data/friend_game_history.db`，后端须能只读打开其 WAL 数据。 |
 | CS_IMAGE_FULL_BUDGET_BYTES | 1073741824。缩略图无清理配置。 |
