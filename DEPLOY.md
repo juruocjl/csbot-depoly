@@ -124,7 +124,7 @@ NapCat 由后端 Compose 的 `napcat` 服务管理。`latest` 标签不会随容
 
 ## 后端发布
 
-涉及 DSH/Mneme AI 改造时，先完成 [AI 专项发布前置步骤](AI_RUNTIME.md#发布前准备)，包括 Node、npm 固定依赖、隔离镜像、服务身份权限与前置检查。仅 pull 并重启不足以完成该版本部署。
+涉及 DSH/Mneme AI 改造时，先完成 [AI 专项发布前置步骤](AI_RUNTIME.md#发布前准备)，包括 Node、npm 固定依赖、隔离镜像、服务身份权限与前置检查。仅 pull 并重启不足以完成该版本部署。当前生产启用双引擎混跑：主对话/压缩/生图经回环 `:7890` 走 OpenAI `gpt-6.2-sol` / `gpt-image-2.6-sunburst`，而 `output_guard`、`memory_extract` 与 `memory_verify` 国内直连 `https://api.deepseek.com` 的 `deepseek-flash`（详见 [AI_RUNTIME.md](AI_RUNTIME.md#副链路国内直连-deepseek-flash-双引擎混跑2026-11-18)）；停服维护前后须成对 `stop` / `start` `csbot-memory-guard.timer` 与 `csbot-health-alert.timer` 避免误触发重启或告警。
 
 以下在服务器执行，前提是本次后端提交已推送到 `main`：
 

@@ -135,7 +135,9 @@ PIP_INDEX_URL 可省略，默认官方源；验收机官方包下载很慢，清
 | cs_ai_model | 从数据库动态配置读取（当前生产默认与已存值均为 `gpt-6.2-sol`，保留切换 DeepSeek 等模型兼容）。 |
 | CS_AI_OPENAI_PROXY_URL | 默认 `http://127.0.0.1:7890`；仅在 OpenAI 端点下对该域名启用回环 HTTP 代理，不影响公网直连抓取。 |
 | CS_AI_IMAGE_MODEL | 默认 `gpt-image-2.6-sunburst`，供 `generate_image` 原生画图工具调用。 |
-| CS_AI_SEARCH_URL / CS_AI_SEARCH_API_KEY | 独立联网搜索 Messages 端点与密钥，主模型切至 OpenAI 后保留原 DeepSeek 搜索通路。 |
+| CS_AI_SEARCH_URL / CS_AI_SEARCH_API_KEY | 独立联网搜索 Messages 端点与密钥，主模型切至 OpenAI 后保留原 DeepSeek 搜索通路；当搜索源为官方 `api.deepseek.com` 时，副链路默认自动同源复用该密钥直连 `https://api.deepseek.com`。 |
+| CS_AI_AUX_ENABLE / CS_AI_AUX_URL / CS_AI_AUX_API_KEY / CS_AI_AUX_MODEL | 副链路（`memory_extract` 与 `memory_verify`）独立配置；OpenAI 主通道下默认启用国内直连 `https://api.deepseek.com` + `deepseek-flash`（无可用 DeepSeek 凭据或 `CS_AI_AUX_ENABLE=0` 时自动回退主通道）。 |
+| CS_AI_GUARD_URL / CS_AI_GUARD_API_KEY / CS_AI_GUARD_MODEL | QQ 出站审查（`output_guard`）独立端点、密钥与模型覆盖；未显式指定时优先走上述直连 `deepseek-flash`（`trust_env=False` 免代理、关闭 thinking），无凭据时平滑回退主模型通道。 |
 | CS_AI_VISION | 默认 true；模型不支持图片时显式 false，不能假装看到了图片。 |
 | CS_AI_CONTEXT_WINDOW | OpenAI 默认 131072，DeepSeek 默认 65536；不应大于服务商实际容量。 |
 | CS_AI_STATE_DIR | `/home/ubuntu/csbot/data/ai`，目录 0700、状态库 0600。 |
@@ -383,3 +385,13 @@ AI 对话页新增按需展开的“本轮提供给模型的上下文”，与�
 - 运维 SQLite `data/ai/state.sqlite3` 新增只追加表 `ai_usage`（自增主键 `id INTEGER PRIMARY KEY AUTOINCREMENT`），记录 `chat`、`memory_extract`、`memory_verify`、`compaction`、`image_gen`、`image_edit`、`output_guard` 七类场景的 Token 明细（恒满足 `input_tokens == uncached_input_tokens + cached_tokens + cache_write_tokens`）、`cost_usd`、`nocache_cost_usd` 及图像规格 `size`/`quality`，不存储请求正文、群消息或任何密钥。
 - `POST /api/ai/events` 在 `ready`/`done` 与实时 `usage` 事件中附带当前 `run_id` 的汇总（`run_usage_summary`），供 `/ai-chat` 网页展示本轮 Token、缓存命中率与折算费用。
 - `GET /api/internal/ai-usage?after_id=0&limit=500`（`1 <= limit <= 2000`）仅供本机回环（`127.0.0.0/8`、`::1`）与 Tailnet（`100.64.0.0/10`、`fd7a:115c:a1e0::/48`）直连只读拉取：凡携带 `X-Forwarded-*` / `X-Real-IP` / `Forwarded` 等转发头或源 IP 非回环/Tailnet（如 `csbot-homepage` Docker 网桥 `172.18.0.x` 与公网地址）一律拒绝 `403`。
+
+## 副链路国内直连 `deepseek-flash` 双引擎混跑（2026-11-18）
+
+- 主对话（`chat`）、长会话自动压缩（`compaction`）及生图/改图（`image_gen` / `image_edit`）继续使用 OpenAI `gpt-6.2-sol` / `gpt-image-2.6-sunburst`（按域名精确路由 `http://127.0.0.1:7890` 回环代理）。
+- 当存在可用的官方 DeepSeek 凭据（显式 `CS_AI_AUX_*` / `CS_AI_GUARD_*`，或同源复用 `api.deepseek.com` 的 `CS_AI_SEARCH_API_KEY`）时，`runner.py` 在 DSH 内同时启用 `@deepseek-ai/dsh-llm-pi-ai`（`openai`）与 `@deepseek-ai/dsh-llm-deepseek`（`deepseek-official`）双 Provider：
+  1. `output_guard`（`plugins/cs_ai/__init__.py`）以 `trust_env=False` 直连 `https://api.deepseek.com/chat/completions`（`model="deepseek-flash"`, `thinking={"type": "disabled"}`）；
+  2. `memory_extract` 通过 `@modusensus/dsh-mneme` 的 `summarizeProvider="deepseek-official"`、`summarizeModel="deepseek-flash"`、`summarizeReasoningEffort="off"` 直连（`bridge.mjs` `undici` 对非 `api.openai.com` 域名保持原生 `Pool` 免代理）；
+  3. `memory_verify`（`bridge.mjs` `verifyMemory`）路由至 `deepseek-official / deepseek-flash`（`reasoningEffort="off"`）；
+  4. 无 DeepSeek 凭据或设置 `CS_AI_AUX_ENABLE=0` 时，三处副链路自动回退至主模型通道，第三方搜索网关凭据绝不跨源转发。
+- `bridge.mjs` 与 `ai_runtime/usage.py` 统一将 DSH 内部路由标识 `deepseek-official` 归一为账本 `provider="deepseek"`，按北京时间峰谷单价（工作日 `09:00–11:59`、`14:00–17:59` 峰时 `$0.30 / $0.006 / $1.20`，其余闲时 `$0.15 / $0.003 / $0.60` USD / 1M tokens）精确写入 `ai_usage` 表并由 `/api/internal/ai-usage` 供下游 `@cost` 分列统计。
