@@ -1,5 +1,14 @@
 # CSBot 服务器服务清单
 
+## 2026-11-21 S 段位等效分数（ELO 排名与 `/分数变化` 折线图）三端上线
+
+- 按 `cjl` 拍板授权完成 S 段位等效分功能全链路发布：
+  1. **代码与前端产物快进更新**：后端 `/home/ubuntu/csbot` 从 `96f768358868022c7550edfc7cc3e377b53e9df8` 经 GitHub、`git pull --ff-only origin main` 快进至 `9f650eaeafaba280238d47232306093fa4e6a487`（保留既有未提交 `assets/edge/homepage.conf` 未触碰；`steam_monitor_js` 保持 `4c29ee42b4e63f52768e400fc2060b580c0de162`）；前端 `csbot-front` 源码从 `b3cf6dbb38759698506e3c1ee3bc32965d7076b3` 更新至 `92c337980448ef4384e587f7a025c7505e159b60`，经 [Actions 44903960987](https://github.com/juruocjl/csbot-front/actions/runs/44903960987) 构建成功，线上 `/home/ubuntu/csbot/dist` 从 `0fd1b019ba3e6bccc56a504a21bca6b6b27c1943` 经 `umask 022 && git pull --ff-only origin build-output` 快进至 `c3709821151fe79feeae8f1e72bfdda5fedda6bd`。
+  2. **功能与兼容范围**：`plugins/cs_db_val/elo_logic.py` 实现 `pvpScore >= 2401` 时按 `pvpScore + 25 * max(pvpStars, 0)` 折算等效分（不改动数据库结构及原始值），覆盖 `ELO` 排名（`/排名 ELO`、`POST /api/rank` 与网页 `/rank`）和 `/分数变化` 折线图；标准 S 段位（`pvpScore == 2401` 或 `>2401` 且星数 `>0`）在 `/rank` 数值旁展示 `S ★N` 胶囊标注与规则提示，周末联赛 `>2401` 且 0 星保留原值不误标，非 ELO 榜与其他页面保持不变。
+- 发布前确认 AI `queued`/`running` 与 `outbound` `pending`/`sent` 均为 0，成对暂停 `csbot-memory-guard.timer` 与 `csbot-health-alert.timer` 后停止 `csbot.service`，于私有目录 `/home/ubuntu/backups/s-elo-20261121-202801/`（`0700`）保存三端原 HEAD 记录及 SQLite backup API 一致性快照 `state-before.sqlite3`（`runs=869`, `integrity_check=ok`, `0600`）。
+- 线上通过 `checks/elo_equivalent_test.py` 10/10、`checks/runtime_config_logic_test.py` 15/15、`checks/season_runtime_integration_test.py` 9/9、`scripts/check_image_identity.py` 7/7、`scripts/check_ai_source.py` 2/2、`scripts/check_ai_boundaries.py` 4/4 后，于 2026-11-21 20:28:55（Asia/Shanghai）恢复 `csbot.service` 及两项守护 timer：`MainPID=1763085`、`NRestarts=0`、`ActiveState=active`，`mihomo.service`、`docker.service` 与两项 timer 均为 `active`，启动日志无 `ERROR`/`Exception`。
+- 线上实测验收：`csbot-health-alert.py --dry-run` 返回 `issues={}`（`disk_available_mib=5977`, `memory_available_mib=1358`）；Steam Monitor `:5555/api/health` 返回 `ok=True, loggedOn=True, friendStatusReady=True, friendCount=36`（`高速隧道1x-台湾-1`）；公网 HTTPS `/rank`、`/assets/index-C0E76J6w.js`、`/assets/index-DReCIn0M.css` 均 `200`，匿名 `POST /api/rank` 返回 `401`；既有已验证令牌只读实测 `POST /api/rank`：`ELO/本赛季` HTTP `200`（27 人，榜首 `rawPvpScore=2401, pvpStars=2 -> value=2451.0, badgeText="S ★2"`）、`ELO/上赛季` HTTP `200`（30 人，周末联赛 `2502/0星` 保持 `2502.0, badgeText=None`）、`rt/本赛季` HTTP `200`（31 人，新字段全 `None` 兼容）。
+
 ## 2026-11-18 副链路（`output_guard` / `memory_extract` / `memory_verify`）切换国内直连 `deepseek-flash` 双引擎混跑上线
 
 - 按 `cjl` 授权将副链路切换至国内直连 DeepSeek 官方 `deepseek-flash`，保持主对话/压缩与画图走 OpenAI：
