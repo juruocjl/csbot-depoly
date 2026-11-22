@@ -1,5 +1,15 @@
 # 本地交付验收
 
+## 2026-11-22 自动生日祝福（DSH 全量检索 + 0 点群公告）上线验收
+
+- **`csbot`（`35f4d76319dec48cc491a3ff2eca857fe7df4022`，含 `1c3ae77` 与 `35f4d76`）**：
+  - `plugins/runtime_config/logic.py` 新增 `birthday_overrides`（`string_map`，严格校验 QQ 号及 `"MM-DD"` / `"none"`，前端 `/admin/config` 零改动自动热编辑）；
+  - `ai_runtime/store.py` 新增 `birthday_cooldowns` 与 `birthday_wishes` 表（`PRIMARY KEY(group_id, user_id, year)` 年度幂等，零 PG 迁移）并开放同群 `/ai-chat` 读取 `channel="birthday"`；
+  - `ai_runtime/runner.py`、`ai_runtime/service.py`、`ai_runtime/dsh/bridge.mjs` 与 `plugins/cs_ai/__init__.py` 支持 `channel="birthday"`、SQLite Online Backup API 只读挂载本群 `qq:{gid}` Mneme 记忆快照（禁用 `memory_save`/`memory_forget`/`generate_image`）、`scene="birthday_wish"` 计费归因，并修复 `bridge.mjs` 在 >64 KiB 管道输出时未等 `stdout` 刷盘即 `process.exit` 导致末帧 JSON 截断的潜伏隐患；
+  - 新增 `plugins/birthday/{__init__.py,config.py,logic.py}` 并在 `bot.py` 注册，覆盖资料+覆盖解析（含 `02-29` 平年 `02-28` 触发）、24h 自助冷却与群命令、北京时间 `23:50` 预生成 + `00:00` 准点 `_send_group_notice` 发公告（`pinned=0, confirm_required=0`，权限不足降级群 `@` 消息，`00:00–00:15` 重启补偿），同步更新 `plugins/small_funcs/__init__.py` `/帮助` 与 `ai_runtime/source-manifest.json`（LF SHA256），保留 `assets/edge/homepage.conf` 未触碰。`csbot-front` 与 `steam_monitor_js` 无需改动。
+- **本机与线上全套单测**：本机 Windows 通过 `checks/birthday_logic_test.py` 23/23、`checks/birthday_runtime_test.py` 19/20（1 skipped symlink）、`checks/runtime_config_logic_test.py` 17/17、`checks/ai_usage_test.py` 30/30、`checks/openai_runtime_test.py` 30/30、`checks/output_guard_logic_test.py` 7/7 与 `node --check ai_runtime/dsh/bridge.mjs`；线上 Linux 全部 147/147 通过（含 `birthday_runtime_test.py` 20/20 全绿、`check_ai_source.py` 2/2、`check_ai_boundaries.py` 4/4、`check_dsh_runtime.py` 14/14）及服务身份 `ai_preflight.py` 通过。
+- **线上生产与端到端实测验收**：① 隔离沙盒实测主群 `832126798` 只读 Mneme 快照全量检索写作（零发主群、主群 284 条记忆零修改），实证 AI 自动检索记忆、聊天与 CS 战绩写出个性化祝福，`output_guard` `allow` 且 `ai_usage` 准确落库 `birthday_wish` 与 `output_guard`；② 获授权测试群 `1058060222` 端到端生成并调用 `_send_group_notice` 实发 1 条群公告，`_get_group_notice` 复验公告数 `0 -> 1`；③ `csbot.service`（`MainPID=2152379`, `NRestarts=0`）、两项守护 timer、`csbot-health-alert.py --dry-run`（`issues={}`）、Steam Monitor、公网 `/admin/config` 与 Tailnet/公网 `/api/internal/ai-usage` 隔离校验全部通过，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-21 S 段位等效分数（ELO 排名与 `/分数变化` 折线图）三端上线验收
 
 - **`csbot`（`9f650eaeafaba280238d47232306093fa4e6a487`）**：新增零外部依赖纯逻辑模块 `plugins/cs_db_val/elo_logic.py`（`pvpScore >= 2401` 时按 `pvpScore + 25 * max(pvpStars, 0)` 计算等效分，不改库表与原始值；标准 S 段位即 `pvpScore == 2401` 或 `pvpScore > 2401 and pvpStars > 0` 生成 `S ★N` 标注，保留 `PVP周末联赛` `>2401` 且 0 星原值不误标）。更新 `plugins/cs_db_val/__init__.py`（`DataManager.get_elo_detail`、`get_elo`、`get_pvp_score_history`）、`plugins/cs_server/__init__.py`（`RankItem` 向后兼容新增可选 `rawPvpScore` / `pvpStars` / `badgeText`，`POST /api/rank` 对 `ELO` 榜直调 `get_elo_detail` 避免二次查库）、`plugins/cs/__init__.py`（`/分数变化` Y 轴标签更新为“天梯等效分数（S 每星 +25）”）及 `ai_runtime/source-manifest.json`（按 LF 字节同步更新 `cs_db_val` 与 `cs` 两项 SHA256），保留 `assets/edge/homepage.conf` 既有改动未触碰。
