@@ -1,5 +1,13 @@
 # CSBot 服务器服务清单
 
+## 2026-11-23 OpenAI 主链路国内直连 `deepseek-flash` 自动兜底与短时熔断上线
+
+- 按 `cjl` 拍板授权完成 OpenAI 主通道故障自动切换国内直连 `deepseek-official`（`deepseek-flash`）与短时熔断全链路发布：
+  1. **代码快进更新与改动边界**：后端 `/home/ubuntu/csbot` 从 `15cb847d71f405e990451a1571dbc764fbd017c0` 经 GitHub、`git pull --ff-only origin main` 快进至 `498766d4dacb7f1f268cd9feecfdc7d40244eb33`（保留既有未提交 `assets/edge/homepage.conf` 未触碰；`dist` 保持 `c3709821151fe79feeae8f1e72bfdda5fedda6bd`、`steam_monitor_js` 保持 `4c29ee42b4e63f52768e400fc2060b580c0de162`；零 `.env.prod` 改动、零数据库迁移、零前端改动）。
+  2. **双层协同机制与安全边界**：① `ai_runtime/openai_support.py` 与 `ai_runtime/runner.py` 实现线程安全宿主级 `OpenAICircuitBreaker`（`CLOSED -> OPEN -> HALF_OPEN`，默认阈值 `1`、冷却 `240s`、单探针租约 + 全生命周期 `try/finally` 防异常死锁），自动同源复用官方 `api.deepseek.com` 凭据，`OPEN` 态零等待直走 `deepseek-flash` 纯文本降级；② `ai_runtime/dsh/bridge.mjs` 通过 `agent/request` + `agent/request-error` 实现轮内步骤级无缝切换（不重跑前序工具副作用、不中断 `steer`、覆盖 `compaction` 与 `verifyMemory` 兜底，OpenAI `ProxyAgent.connectTimeout` 默认 `10s`，`CLOSED` 态 `retryPolicy` 仅对 `SERVER`/`EMPTY_RESPONSE` 允许 1 次 500ms 快试，`HALF_OPEN` 态 `maxRetries=0`）；③ 依托 DSH `LlmRuntime.adapterStream` 自动剥离跨 adapter `replayState` 与投影历史图片块，降级态拦截 `generate_image`/`read_image` 防死循环并如实提示，业务 `400`/`CONTEXT_WINDOW_EXCEEDED`/`ABORTED` 不误触发兜底；全场景兜底调用以 `provider="deepseek", model="deepseek-flash"` 精确写入 `ai_usage`。
+- 发布前确认 AI `queued`/`running` 与 `outbound` `pending`/`sent` 均为 0，成对暂停 `csbot-memory-guard.timer` 与 `csbot-health-alert.timer` 后停止 `csbot.service`，于私有目录 `/home/ubuntu/backups/openai-fallback-20261123-221804/`（`0700`）保存三端原 HEAD 记录及 SQLite Online Backup API 一致性快照 `state-before.sqlite3`（`runs=898`, `ai_usage=497`, `integrity_check=ok`, `0600`）。
+- 线上通过全部 **164/164** 项回归（`checks/openai_fallback_test.py` 38/38、`checks/openai_runtime_test.py` 30/30、`checks/ai_usage_test.py` 30/30、`checks/birthday_runtime_test.py` 28/28、`checks/output_guard_logic_test.py` 7/7、`scripts/check_ai_boundaries.py` 4/4、`scripts/check_ai_source.py` 2/2、`scripts/check_dsh_runtime.py` 14/14、`scripts/check_openai_fallback_dsh.py` 11/11 真 DSH 双 Mock E2E）及服务身份严格 `ai_preflight.py` 5/5 后，于 `2026-11-23 22:19:37`（Asia/Shanghai）恢复 `csbot.service` 与两项守护 timer：`MainPID=2792255`、`NRestarts=0`、`ActiveState=active`，启动日志确认所有插件加载与数据库结构校验通过、OneBot `669299191` 在线且无 `ERROR`/`Exception`；`csbot-health-alert.py --dry-run` 返回 `issues={}`（`disk_available_mib=5267`, `memory_available_mib=1488`），Steam Monitor `:5555/api/health` 三项就绪 `true`（`friendCount=36`, `🇺🇸 US-T1`），`1234` 与公网 HTTPS `/ai-chat` 均 `200`、匿名 `/api/admin/runtime-config` `401`、Windows 直连 Tailnet `http://100.101.30.74:8888/api/internal/ai-usage?limit=1` `200`（`max_id=497`）、公网反代 `/api/internal/ai-usage` `403`。
+
 ## 2026-11-22 自动生日祝福（DSH 全量检索 + 0 点群公告）上线
 
 - 按 `cjl` 拍板授权完成自动生日祝福功能全链路发布：

@@ -1,5 +1,17 @@
 # 本地交付验收
 
+## 2026-11-23 OpenAI 主链路国内直连 `deepseek-flash` 自动兜底与短时熔断上线验收
+
+- **`csbot`（`498766d4dacb7f1f268cd9feecfdc7d40244eb33`）**：
+  - `ai_runtime/openai_support.py` 新增 `resolve_openai_fallback`（与 `CS_AI_AUX_ENABLE` 正交、严守同源凭据隔离，自动复用官方 `api.deepseek.com` 搜索密钥）、`is_openai_fallback_eligible`（放行 `TRANSPORT`/`TIMEOUT`/`SERVER`/`RATE_LIMIT`/`QUOTA`/`AUTH`/`EMPTY_RESPONSE`/`STREAM_CLOSED` 及代理/网络类未知错，明确拒绝 `INVALID_REQUEST`/`CONTEXT_WINDOW_EXCEEDED`/`ABORTED` 等业务与本地配置错）与线程安全 `OpenAICircuitBreaker`（`CLOSED -> OPEN -> HALF_OPEN`，默认阈值 `1`、冷却 `240s`、单探针租约防惊群、`release_probe` 防取消/异常死锁、`reason` 自动脱敏）；
+  - `ai_runtime/runner.py` 接入宿主级熔断路由（`OPEN` 态零等待直走 `deepseek-official/deepseek-flash` 纯文本降级模式；`HALF_OPEN` 态单探针 `maxRetries=0` 且外层 `try/finally` 覆盖整个 `run_dsh` 生命周期释放探针租约；`CLOSED` 态 OpenAI `retryPolicy` 收紧为 `maxRetries=1` 仅重试 `EMPTY_RESPONSE`/`SERVER`，并注入 `CSBOT_OPENAI_CONNECT_TIMEOUT_MS` 默认 `10000`ms）；
+  - `ai_runtime/dsh/bridge.mjs` 新增 `agent/request` + `agent/request-error` 轮内步骤级无缝切换（不重复写 `user/message`、不重跑前序已完成工具副作用、不中断实时 `steer`，立即上报 `fallback` 跳闸宿主熔断器）、`compaction` 失败兜底、`verifyMemory` 兜底及 `generate_image`/`read_image` 防死循环诚实降级拦截（保持 `tapUsage(next())` 计数严格为 3）；
+  - 新增 `checks/openai_fallback_test.py`（38 项纯离线单测）与 `scripts/check_openai_fallback_dsh.py`（11 项真 DSH `0.1.5-rc.3` 回环双 Mock 端到端集成验收）；保留 `assets/edge/homepage.conf` 既有改动未触碰。`csbot-front` 与 `steam_monitor_js` 无需改动。
+- **本机与线上全套单测/集成验收**：
+  - 本机 Windows 通过 `checks/openai_fallback_test.py` 38/38、`checks/openai_runtime_test.py` 30/30、`checks/ai_usage_test.py` 30/30、`checks/birthday_runtime_test.py` 27/28（1 skipped symlink）、`checks/output_guard_logic_test.py` 7/7 与 `node --check ai_runtime/dsh/bridge.mjs`；
+  - 线上 Linux 全部 **164/164** 通过：`checks/openai_fallback_test.py` 38/38、`checks/openai_runtime_test.py` 30/30、`checks/ai_usage_test.py` 30/30、`checks/birthday_runtime_test.py` 28/28、`checks/output_guard_logic_test.py` 7/7、`scripts/check_ai_boundaries.py` 4/4、`scripts/check_ai_source.py` 2/2、`scripts/check_dsh_runtime.py` 14/14、`scripts/check_openai_fallback_dsh.py` 11/11（覆盖 503 轮内切换、熔断直降、半开恢复、429 探测续熔断、工具副作用仅执行 1 次、画图/读图降级防死循环、跨 Provider 历史图片与 reasoning 块互转、400 拒绝兜底、`birthday_wish` 与 `compaction` 计费归因及跨源凭据隔离），以及服务身份严格 `scripts/ai_preflight.py` 5/5 通过。
+- **线上生产发布与验活**：`csbot.service`（`MainPID=2792255`, `NRestarts=0`, `active`）、两项守护 timer、OneBot `669299191` 在线、`csbot-health-alert.py --dry-run` `issues={}`、Steam Monitor 三项就绪 `true`、公网 `/ai-chat` `200`、匿名 `/api/admin/runtime-config` `401`、Windows 直连 Tailnet `/api/internal/ai-usage` `200` 及公网反代 `403` 全部通过，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-22 自动生日祝福（DSH 全量检索 + 0 点群公告）上线验收
 
 - **`csbot`（`35f4d76319dec48cc491a3ff2eca857fe7df4022`，含 `1c3ae77` 与 `35f4d76`）**：

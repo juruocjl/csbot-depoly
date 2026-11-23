@@ -137,6 +137,7 @@ PIP_INDEX_URL 可省略，默认官方源；验收机官方包下载很慢，清
 | CS_AI_IMAGE_MODEL | 默认 `gpt-image-2.6-sunburst`，供 `generate_image` 原生画图工具调用。 |
 | CS_AI_SEARCH_URL / CS_AI_SEARCH_API_KEY | 独立联网搜索 Messages 端点与密钥，主模型切至 OpenAI 后保留原 DeepSeek 搜索通路；当搜索源为官方 `api.deepseek.com` 时，副链路默认自动同源复用该密钥直连 `https://api.deepseek.com`。 |
 | CS_AI_AUX_ENABLE / CS_AI_AUX_URL / CS_AI_AUX_API_KEY / CS_AI_AUX_MODEL | 副链路（`memory_extract` 与 `memory_verify`）独立配置；OpenAI 主通道下默认启用国内直连 `https://api.deepseek.com` + `deepseek-flash`（无可用 DeepSeek 凭据或 `CS_AI_AUX_ENABLE=0` 时自动回退主通道）。 |
+| CS_AI_OPENAI_FALLBACK_ENABLE / MODEL / COOLDOWN_SECONDS / FAIL_THRESHOLD / CS_AI_OPENAI_CONNECT_TIMEOUT_MS | OpenAI 主链路自动兜底与熔断参数；默认开启（`1`）、目标 `deepseek-flash`、冷却 `240` 秒、阈值 `1` 次、代理建连超时 `10000`ms（可选 `CS_AI_FALLBACK_URL` / `CS_AI_FALLBACK_API_KEY` 覆盖，默认同源复用官方 DeepSeek 凭据）。 |
 | CS_AI_GUARD_URL / CS_AI_GUARD_API_KEY / CS_AI_GUARD_MODEL | QQ 出站审查（`output_guard`）独立端点、密钥与模型覆盖；未显式指定时优先走上述直连 `deepseek-flash`（`trust_env=False` 免代理、关闭 thinking），无凭据时平滑回退主模型通道。 |
 | CS_AI_VISION | 默认 true；模型不支持图片时显式 false，不能假装看到了图片。 |
 | CS_AI_CONTEXT_WINDOW | OpenAI 默认 131072，DeepSeek 默认 65536；不应大于服务商实际容量。 |
@@ -395,3 +396,10 @@ AI 对话页新增按需展开的“本轮提供给模型的上下文”，与�
   3. `memory_verify`（`bridge.mjs` `verifyMemory`）路由至 `deepseek-official / deepseek-flash`（`reasoningEffort="off"`）；
   4. 无 DeepSeek 凭据或设置 `CS_AI_AUX_ENABLE=0` 时，三处副链路自动回退至主模型通道，第三方搜索网关凭据绝不跨源转发。
 - `bridge.mjs` 与 `ai_runtime/usage.py` 统一将 DSH 内部路由标识 `deepseek-official` 归一为账本 `provider="deepseek"`，按北京时间峰谷单价（工作日 `09:00–11:59`、`14:00–17:59` 峰时 `$0.30 / $0.006 / $1.20`，其余闲时 `$0.15 / $0.003 / $0.60` USD / 1M tokens）精确写入 `ai_usage` 表并由 `/api/internal/ai-usage` 供下游 `@cost` 分列统计。
+
+## OpenAI 主链路国内直连 `deepseek-flash` 自动兜底与短时熔断（2026-11-23）
+
+- 在保持 OpenAI 主通道（`gpt-6.2-sol` / `gpt-image-2.6-sunburst` 经 `:7890` 回环代理）为首选的前提下，新增双层协同故障转移机制（零数据库迁移、零前端改动，自动同源复用已有官方 DeepSeek 凭据，默认开启，可通过 `CS_AI_OPENAI_FALLBACK_ENABLE=0` 关闭）：
+  1. **Layer 1 · 宿主进程级熔断器（`ai_runtime/openai_support.py` `OpenAICircuitBreaker` + `ai_runtime/runner.py`）**：线程安全 `CLOSED -> OPEN -> HALF_OPEN` 状态机。OpenAI 出现代理断连/不可达（`TRANSPORT`）、连接或流空闲超时（`TIMEOUT`，`ProxyAgent.connectTimeout` 默认收敛至 `10s`，可通过 `CS_AI_OPENAI_CONNECT_TIMEOUT_MS` 调整）、`5xx`（`SERVER`）、`429`（`RATE_LIMIT` / `QUOTA`）、`401`/`403`（`AUTH`）、`EMPTY_RESPONSE` 或 `STREAM_CLOSED` 时跳闸熔断（默认 `CS_AI_OPENAI_FALLBACK_FAIL_THRESHOLD=1`，冷却窗 `CS_AI_OPENAI_FALLBACK_COOLDOWN_SECONDS=240` 秒）；业务 `400 INVALID_REQUEST`、`CONTEXT_WINDOW_EXCEEDED` 与主动取消 `ABORTED` 不触发兜底与熔断。熔断开启期间新轮次零等待直走 `deepseek-official / deepseek-flash`（纯文本 `65536` 上下文）；窗口到期后仅放行单个半开探测租约（并发请求仍走兜底防惊群，探测 `maxRetries=0` 且 `try/finally` 覆盖整个 `run_dsh` 生命周期防异常死锁），成功即合闸恢复 OpenAI，失败续熔断且本轮仍无缝切至 DeepSeek 完成回复。
+  2. **Layer 2 · DSH 轮内步骤级无缝切换（`ai_runtime/dsh/bridge.mjs`）**：闭合态对 OpenAI 路由配置精简 `retryPolicy`（仅 `EMPTY_RESPONSE`/`SERVER` 允许 1 次 500ms 快速重试，其余故障零重试交由 `agent/request-error` 接管），通过 `agent/request` + `agent/request-error` 钩子在当前 `step` 原地切至 `deepseek-official / deepseek-flash` 并立即上报 `fallback` 事件跳闸宿主熔断器，不重复写入 `user/message`、不重跑前序已完成工具副作用、不中断实时 `steer`；同时覆盖 `compaction` 失败兜底与 `CS_AI_AUX_ENABLE=0` 场景下 `verifyMemory` 兜底。
+  3. **跨 Provider 会话兼容、能力降级与计费对齐**：依托 DSH `LlmRuntime.adapterStream` 自动剥离跨 adapter `replayState` 并将历史 `read_image` 图片块投影为纯文本占位，确保 OpenAI 与 `deepseek-flash` 来回切换不报 `UNSUPPORTED_CONTENT`；降级模式下关闭或拦截 `generate_image` 与 `read_image` 并给出明确诚实中文提示防止死循环（`csdata.image(id)` 文本 metadata 与 `execute_python` 绘图不受影响）；所有兜底轮次（含 `chat`、`birthday_wish`、`compaction`）均以 `provider="deepseek", model="deepseek-flash"` 按北京时间峰谷单价精确写入 `ai_usage`。
