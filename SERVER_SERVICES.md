@@ -1,5 +1,12 @@
 # CSBot 服务器服务清单
 
+## 2026-11-24 TeamSpeak 边缘 HTTP 代理（`cgserver`）与 `plugins/ts` 单次异步接入上线
+
+- 按 `cjl` 拍板方案 B 解决跨洋 `/getts` / `/poke` 串行 `N+7` 次 Telnet 往返与阻塞问题：
+  - 后端 `csbot` 从 `2b9abb860d84e935f28ba54a8b8d387cbbbd5b04` 快进至 `422543363a68de399cf8f1980c30453863b32b12`（`gcp` `/home/dev/csbot` 与 `cgserver` `/home/ubuntu/csbot` 双机对齐）：抽出纯标准库共享模块 `plugins/ts/tree.py`（仅 1 次 `use`、移除无用逐频道 `channelinfo` 循环），新增仅 Tailnet+Bearer 鉴权代理 `scripts/ts_query_proxy.py` 与加固 systemd 模板 `assets/edge/csbot-ts-proxy.service`，改造 `plugins/ts` 支持单次 Keep-Alive 异步 HTTP（未配置 `TS_PROXY_URL` 时自动回退 `asyncio.to_thread` 去重直连）。
+  - `cgserver` 安装并启用 `csbot-ts-proxy.service`（私有 `/etc/csbot/ts-proxy.env` `0600` 存 `TS_PROXY_TOKEN` 与 `TS_PSWD`，仅监听 `100.101.30.74:18011`，公网 `42.193.244.178:18011` 实测阻断，`cgserver` 本地查树仅 `6.1 ms`，匿名 `/tree` 返回 `401`）。
+  - `gcp` 无回显写入 `TS_PROXY_URL` / `TS_PROXY_TOKEN` 至 `.env.prod`（留 `.env.prod.bak-tsproxy` `0600`），Linux 端 `checks/ts_proxy_test.py` 36/36、`scripts/check_ai_source.py` 2/2、`scripts/check_ai_boundaries.py` 4/4 全绿，重启 `csbot.service` 与双机体检全绿。
+
 ## 2026-11-24 截图浏览器常驻复用（`gcp`）与 DSH 前端本地缓存反代（`cgserver`）上线
 
 - **截图浏览器常驻单实例复用（`gcp`）**：
