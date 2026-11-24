@@ -1,5 +1,18 @@
 # 本地交付验收
 
+## 2026-11-24 `cgserver` ↔ `gcp` 拆分迁移与常驻 DSH Full Web 验收
+
+- **`csbot`（`6cad5eadc972c3b50a63959b37e8805338683959`，含 `1eb9d57` 与 `6cad5ea`）**：
+  - 新增常驻 DSH Full Web 架构：`ai_runtime/dsh/daemon-launch.mjs`（导出纯函数 `resolveDaemonConfig`，同源派生 `CS_AI_*`、`CSBOT_DIRECT_EGRESS=1` 默认直连出站、禁用会话自动标题、`isMain` 守卫）与 `ai_runtime/dsh/daemon-bridge.mjs`（回环 `:32151` Bearer HTTP 控制面、按会话隔离 `TurnState`、WebUI 默认只读网关守卫、保留无网 Docker 沙箱 / `output_guard` / OpenAI→DeepSeek 轮内兜底 / `ai_usage` 计费），配合 `ai_runtime/dsh/layered-memory.mjs`（`ownWorkspace`/`sessionWorkspace` 拆分支持只读 `birthday` 轮次不破坏 `SOURCE.md`）、`ai_runtime/runner.py`（daemon RPC 客户端与 `subprocess` 双模并修复 `rpc_slots` 重入死锁）、`ai_runtime/service.py`、`ai_runtime/memory_browser.py`、`scripts/migrate_mneme_to_daemon.py` 及 `scripts/ai_preflight.py`；
+  - 新增跨洋拆分运维组件：`plugins/allmsg/outgoing.py`（`CS_NAPCAT_LOCAL_IMGS_ROOT` 将静态 `imgs/pic`/`imgs/mgz` 转 NapCat 本地 `file:///app/imgs/...` 免跨洋 base64）、`plugins/allmsg/__init__.py`（`CS_ONEBOT_LOOKUP_TIMEOUT` 并按 LF 更新 `ai_runtime/source-manifest.json`）、`scripts/matrix_push_proxy.py`（最小白名单 HTTP/CONNECT 代理仅绑 Tailnet `:18080`）、`scripts/health_alert.py`（`--profile full|edge|gcp`、支持 Tailnet/HTTPS homeserver 与 `vnstat` 月出站流量分级告警）、`deploy/gcp-direct.env` 及 `deploy/systemd/*` 模板；
+  - 新增 `checks/gcp_migrate_test.py`（50 项离线单测）与 `scripts/check_dsh_daemon.py`（14 项真 DSH 常驻 Web 宿主端到端测试）。`csbot-front` 与 `steam_monitor_js` 无需改码。
+- **GCP 真 Linux 全套回归与隔离验收（`244/244` 全绿）**：
+  - 单元测试与边界校验：`checks/gcp_migrate_test.py` 50/50、`checks/openai_fallback_test.py` 38/38、`checks/openai_runtime_test.py` 30/30、`checks/ai_usage_test.py` 30/30、`checks/birthday_runtime_test.py` 28/28、`checks/health_alert_test.py` 13/13、`checks/output_guard_logic_test.py` 7/7、`scripts/check_ai_source.py` 2/2、`scripts/check_ai_boundaries.py` 4/4、`scripts/check_ai_sandbox.py` 3/3；
+  - 真 DSH 端到端：`scripts/check_dsh_runtime.py` 14/14、`scripts/check_openai_fallback_dsh.py` 11/11、`scripts/check_dsh_daemon.py` 14/14；服务身份严格 `scripts/ai_preflight.py` 6/6 通过。
+- **双机生产切流与端到端实测**：
+  - 数据迁移完整一致：PostgreSQL 576,866 条 `groupmsg` / 52,853 条 `matches` / `alembic_version=20261102_add_schedule`、`state.sqlite3` / `media-cache.sqlite3` / `friend_game_history.db` / `nonebot_plugin_orm/db.sqlite3` 全量校验通过，统一 Mneme 迁移 77 scope / 317 记忆（主群 284 条零丢失）；
+  - 双机健康与网络隔离实测：`gcp` `health_alert --profile gcp --dry-run` 返回 `issues={}`（可用磁盘 `34.3 GiB`、可用内存 `6.1 GiB`、`vnstat` TX `24.07 MiB`），Steam Monitor 纯直连三项就绪 `true`，Chromium 真实截图 `/major-homework` `51,458` 字节，TeamSpeak `100.101.30.74:10011` 连通；`cgserver` 可用内存由 `~0.6 GiB` 升至 `2.2 GiB`，公网 `https://cs.ave-mujica.top/` 与 `matrix.ave-mujica.top` HTTP `200`、匿名 `/api/admin/runtime-config` `401`、公网 `/api/internal/ai-usage` `403`，Tailnet `http://100.91.58.65:8888/api/internal/ai-usage` `200`、Tailnet `http://100.91.58.65:32150/` `401`（鉴权拦截），公网探测 `34.82.49.6:{8888,32150,18080}` 全部阻断；未向主 QQ 群发送任何测试消息。`csbot-napcat` 重建容器挂载只读图库后待 `cjl` 在 `http://cgserver:6099/webui/` 扫码恢复 QQ 在线，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-23 OpenAI 主链路国内直连 `deepseek-flash` 自动兜底与短时熔断上线验收
 
 - **`csbot`（`498766d4dacb7f1f268cd9feecfdc7d40244eb33`）**：
