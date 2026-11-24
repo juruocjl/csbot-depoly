@@ -1,5 +1,14 @@
 # CSBot 服务器服务清单
 
+## 2026-11-24 截图浏览器常驻复用（`gcp`）与 DSH 前端本地缓存反代（`cgserver`）上线
+
+- **截图浏览器常驻单实例复用（`gcp`）**：
+  - 后端 `csbot` 从 `6cad5eadc972c3b50a63959b37e8805338683959` 快进至 `2b9abb860d84e935f28ba54a8b8d387cbbbd5b04`（`gcp` `/home/dev/csbot` 已 `pull --ff-only` 并重启 `csbot.service`）。
+  - 新增 `ai_runtime/screenshot_browser.py`，将 `plugins/cs_server/__init__.py`（`get_screenshot`）与 `plugins/utils/__init__.py`（`screenshot_html_to_png`）改造为懒加载常驻单实例 Chromium 复用：每次渲染使用独立 `incognito` BrowserContext 隔离 Cookie 与 LocalStorage，并发上限 `CS_SCREENSHOT_MAX_CONCURRENCY=4`、空闲按次回收 `CS_SCREENSHOT_BROWSER_MAX_USES=200`、崩溃/断连自动销毁重建并透明重试 1 次、注册 `driver.on_shutdown` 优雅关闭防孤儿进程，支持 `CS_SCREENSHOT_REUSE_BROWSER=0` 秒级回退冷启；同步更新 `ai_runtime/source-manifest.json` 与 `scripts/check_image_capture.py`。
+  - 本地 127/127 + `gcp` Linux 端 `checks/screenshot_browser_reuse_test.py` 16/16、`scripts/check_ai_source.py` 2/2、`scripts/check_ai_boundaries.py` 4/4、`scripts/check_image_capture.py` 全部通过；真机连续两次截 `/major-homework` 实测单 PID 复用（`1884ms -> 1588ms`），重启后零孤儿 Chrome。
+- **DSH WebUI 前端静态资源本地缓存反代（`cgserver`）**：
+  - 新增独立容器 `csbot-dsh-edge`（`/home/ubuntu/csbot/docker-compose.dsh-edge.yml`、`/home/ubuntu/csbot/dsh-edge/nginx.conf`、`/home/ubuntu/csbot/dsh-web-static/assets/` 共 `4.7M` / 86 文件），严格仅绑定 `100.101.30.74:32150`（公网不可达，不动 `homepage.conf`）：`/assets/` 本地强缓存直出（`X-DSH-Cache: local-edge`，未命中自动回源 `100.91.58.65:32150`），`/`、登录鉴权（`401`）、API、SSE 与 WebSocket 原样透传至 GCP。
+
 ## 2026-11-24 `cgserver` ↔ `gcp` 算力拆分迁移与常驻 DSH Full Web 上线
 
 - 按 `cjl` 拍板方案（`1A` 聊天图档随 NoneBot 迁 GCP + `imgs/pic`、`imgs/mgz` 保留 `cgserver` 本地只读挂载给 NapCat；`2B` GCP 一步到位升级常驻 DSH Full Web 供 Tailnet 内网审阅；`3` Tuwunel 推送经 GCP 白名单出站代理；GCP 全直连零 `:7890` 代理）完成两地生产拆分迁移：
