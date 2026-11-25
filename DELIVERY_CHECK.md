@@ -1,5 +1,19 @@
 # 本地交付验收
 
+## 2026-11-25 Major 瑞士轮盘中对阵 Buchholz 修复、对数走势图归零复活修复与快照重算验收
+
+- **`csbot`（`6c3c7b27e21b6432a385fb36af1e9065adf4a92b`）**：
+  - `plugins/major_hw/simulate.py` 与 `tools/major_simulator.cpp` 同构扩展每队按轮次记录的比赛历史（Python `Record.match_history` / C++ 栈数组 `opp_history[8]`），盘中执行 `round_matches(round_num)` 时先基于第 `round_num - 1` 轮末精确快照锁定整轮真实对阵（覆盖全 5 轮及第 4/5 轮 6 队 `priority_patterns` 与回避逻辑），再剔除本轮已完赛场次；轮次边界走零开销快速路径；
+  - `plugins/major_hw/chart.py` 重写 `_plot_series` 对数分支，按连续正区间分段绘制主线（不跨 `0` 桥接），跌零/多场归零/复活均严格按时间正向绘制短虚线 `(0, (3, 2))` 与底部 `×`，保持单一图例、`STARRED_LINESTYLE` 与线性模式全量跌零标注；
+  - `scripts/recalculate_major_stage_results.py` 扩展 `--match-counts`、`--engine auto|python|cpp` 与 `--preserve-existing-snapshots`，重算历史场次使用临时输出文件绝不覆写根目录 `result.txt` 与 `major_hw` 当前表；
+  - 新增 `checks/major_hw_swiss_fix_test.py`（23 项离线单测，覆盖新加坡 Stage 1 21 场回归、第 20 场精确概率、第 2/4/5 轮盘中回避冲突、C++ 与 Python 逐场一致性、对数/线性归零复活绘图与重算脚本纯函数）。保留 `assets/edge/homepage.conf` 未触碰。
+- **本机与线上测试**：
+  - 本机 Windows：5 套全绿 **141/141**（`major_hw_swiss_fix_test.py` 23/23 含 `g++` 临时编译与 Python 逐场一致性、`major_hw_chart_test.py` 54/54、`major_hw_stars_test.py` 24/24、`major_hw_singapore_test.py` 13/13、`major_virtual_users_test.py` 27/27）；
+  - 线上 `gcp` Linux：`major_hw_swiss_fix_test.py` 20 passed + 3 skipped（无 `g++`）、`major_hw_chart_test.py` 54/54、`major_hw_stars_test.py` 24/24、`major_hw_singapore_test.py` 13/13、`scripts/check_ai_source.py` 2/2、`scripts/check_ai_boundaries.py` 4/4（合计 117 passed / 0 failed）。
+- **线上备份、重算与生产验收（零 QQ 测试消息）**：
+  - `gcp` 停服备份至 `/home/dev/backups/swiss-fix-20261125/`（`pg_dump -Fc` `pg_restore --list` 24 行通过 + `result.txt` / `win_matrix.csv` / 全部 `*.txt.gz` SHA256 留痕），重算受影响的第 `17, 18, 19, 20` 场精确遍历快照（各 `total_weight=1.0`, `15` 人）；马嘉豪（`3442127040`）第 17~20 场分别由 `2.1549% / 2.5297% / 0.3415% / 0.0000%` 修正为 `0.5759% / 0.6796% / 0.7129% / 0.1222%`，15 人第 17~20 场最大单人概率修正幅度 `5.38%`，第 16、21 场及 `result.txt` SHA256 完全不变；
+  - 重启 `csbot.service`（`MainPID=278940`, `NRestarts=0`, `active`, OneBot `669299191` 在线）与 `csbot-health-alert.timer`（`active`），双机巡检 `issues={}`，生产快照渲染线性（`476,702` 字节 `3571×1090`）与对数（`513,750` 字节 `3591×1090`）走势图校验 `series=15, legend=15, dashed=3, solid=12, non_monotonic=0, star_in_legend=False` 且 `0..21` 场全员无归零异常，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-25 Major 作业赛事级打🌟（无通行证排名打星 + 走势图虚线）三端上线验收
 
 - **`csbot`（`4fdef1ecd49854ce9cd2fae95689ce014dba39e7`，含 `3d37e2d` 与 `4fdef1e`）**：

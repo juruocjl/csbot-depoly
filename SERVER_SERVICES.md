@@ -1,5 +1,13 @@
 # CSBot 服务器服务清单
 
+## 2026-11-25 Major 瑞士轮盘中对阵 Buchholz 修复、对数走势图归零复活修复与受影响快照重算上线
+
+- 按 `cjl` 拍板授权完成瑞士轮盘中对阵错配与对数走势图双 Bug 修复及线上受影响快照重算：
+  1. **代码与双机版本**：后端 `csbot` 从 `4fdef1ecd49854ce9cd2fae95689ce014dba39e7` 经 GitHub、`git pull --ff-only origin main` 快进至 `6c3c7b27e21b6432a385fb36af1e9065adf4a92b`（`gcp` `/home/dev/csbot` 与 `cgserver` `/home/ubuntu/csbot` 双机对齐，保留本地未提交 `assets/edge/homepage.conf` 未触碰；前端 `csbot-front`/`dist` 与 `steam_monitor_js` 无需改动）。
+  2. **核心修复**：`plugins/major_hw/simulate.py` 与 `tools/major_simulator.cpp` 同构新增按轮次记录的 `match_history` / `opp_history`，盘中调用 `round_matches(round_num)` 时先还原第 `round_num - 1` 轮末精确战绩与对手快照锁定全轮真实对阵（覆盖全 5 轮及第 4/5 轮 6 队优先级表与回避规则），再剔除本轮已完赛场次；`plugins/major_hw/chart.py` 对数坐标 `_plot_series` 改为按连续正区间分段绘制主线（绝不跨 `0` 桥接）、归零与复活均严格正向连短虚线并打 `×`，保留打🌟长虚线与单一图例；`scripts/recalculate_major_stage_results.py` 扩展 `--match-counts`、`--engine auto|python|cpp`（精确遍历可行时默认 Python exact `total_weight=1.0`）与 `--preserve-existing-snapshots`，重算历史场次使用临时文件绝不覆写根目录 `result.txt` 与 `major_hw` 当前表。
+  3. **备份与受影响快照重算**：核查 `2026-singapore-stage1` 现有 21 场确认受盘中 Buchholz 错配影响场次为第 **17、18、19、20** 场（`0..16` 与 `21` 对阵完全一致）。成对暂停 `csbot-health-alert.timer` 与 `csbot.service` 后，于 `gcp` 私有目录 `/home/dev/backups/swiss-fix-20261125/`（`0700`）保存 `major_hw*` 三张表 `pg_dump -Fc`（`pg_restore --list` 24 行校验通过）、原 `result.txt`/`win_matrix.csv` 及 `data/major_simulations/2026-singapore-stage1/*.txt.gz` 原件与 SHA256。随后执行 `scripts/recalculate_major_stage_results.py --match-counts 17,18,19,20 --engine auto --preserve-existing-snapshots` 完成 4 场精确遍历重算（`65536 / 32768 / 16384 / 8192` 分支，均 `total_weight=1.0`，各 15 条作业快照，耗时共约 `5.7s`），并恢复 `win_matrix.csv` 对齐最新第 21 场。马嘉豪（`3442127040`）第 20 场由错算 `0.0000%` 修正为 `0.1222%`（第 17~19 场亦同步修正），第 16、21 场及根目录 `result.txt` SHA256 保持零改动。
+  4. **上线核验**：恢复 `csbot.service`（`MainPID=278940`、`NRestarts=0`、`ActiveState=active`，OneBot `669299191` 在线，启动日志零报错）与 `csbot-health-alert.timer`（`active`）；双机健康体检均 `issues={}`（`gcp` 自然巡检可用盘 `34770 MiB`、可用内存 `6063 MiB`；`cgserver` `--profile edge --dry-run` 可用盘 `5270 MiB`、可用内存 `2092 MiB`）；公网 `https://cs.ave-mujica.top/major-homework` HTTP `200`、匿名 `POST /api/major/homework/rank` HTTP `401`；生产快照直出线性（`476,702` 字节）与对数（`513,750` 字节）走势图均 `series=15, dashed=3, solid=12, non_monotonic=0, star_in_legend=False`，且 `0..21` 场全员无异常归零点，详见 [DELIVERY_CHECK.md](DELIVERY_CHECK.md)。
+
 ## 2026-11-25 Major 作业赛事级打🌟（无通行证排名打星 + 走势图虚线）三端上线
 
 - 按 `cjl` 拍板定案完成 Major 作业赛事级别打🌟功能全链路发布与生产落库标注：
