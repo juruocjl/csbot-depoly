@@ -1,5 +1,13 @@
 # CSBot 服务器服务清单
 
+## 2026-11-25 Major 作业赛事级打🌟（无通行证排名打星 + 走势图虚线）三端上线
+
+- 按 `cjl` 拍板定案完成 Major 作业赛事级别打🌟功能全链路发布与生产落库标注：
+  1. **代码与三端版本**：后端 `csbot` 从 `8a8a068eeca8787a74410902e16a764ca040411f` 经 GitHub、`git pull --ff-only origin main` 快进至 `4fdef1ecd49854ce9cd2fae95689ce014dba39e7`（含功能提交 `3d37e2d` 与截图视口微调 `4fdef1e`，`gcp` `/home/dev/csbot` 与 `cgserver` `/home/ubuntu/csbot` 双机对齐）；前端 `csbot-front` 源码从 `e3bf464bba0e43a49e49341f225601301a12158a` 更新至 `182efb6242b9c82303132466aea9c2ccb9e6de42`，CI 自动构建并推送 `build-output` `9ceb9f94f043aae2df7daa77d696f5c7ac537cf1`（`gcp` `/home/dev/csbot/dist` 与 `cgserver` `/home/ubuntu/csbot/dist` 均以 `umask 022` 快进对齐，保留既有未提交 `assets/edge/homepage.conf` 未触碰）。
+  2. **核心实现与零迁移落库**：新增 `plugins/major_hw/stars.py`，按赛事键 `major_name`（如 `2026-singapore`）持久化到 `local_storage["major_hw_stars"]`（零数据库结构迁移、同一届 Major 跨阶段共享、下届自动隔离）；新增 SUPERUSER 命令 `/作业打星`（列表/添加/取消，仅从 `CommandArg` 解析 `@`/QQ/主播名）；后端 `/api/major/homework/rank`（瑞士轮+淘汰赛）、`/history`、`/personal` 向后兼容扩展 `rank` / `isStarred`；前端 `MajorHomeworkRank.vue` 最左侧新增「排名」列（普通玩家 `1,2,3...`，打🌟玩家显示 `🌟` 无数字且不占名次、按概率原地混排），`_get_major_rank_screenshot` 宽度调至 `820px` 保证零横向溢出；`plugins/major_hw/chart.py` 对打🌟玩家折线渲染为长虚线 `(0, (6, 3))` 且图例不画 🌟/★。
+  3. **备份与生产名单标注**：发布前于 `gcp` 私有目录 `/home/dev/backups/hw-star-20261125/`（`0700`）留存原 HEAD 与 `local_storage.dump`（`pg_restore --list` 校验通过）；按群聊核实并经 `cjl` 拍板确认的明确未购通行证 3 位成员写入生产库 `local_storage["major_hw_stars"] = {"2026-singapore": ["2078553406", "3345039979", "3442127040"]}`（星/防身、cbyybc、马嘉豪）。
+  4. **上线核验**：`gcp` 重启 `csbot.service` 后 `MainPID=264343`、`NRestarts=0`、`ActiveState=active`，OneBot `669299191` 在线且无启动报错；双机体检均通过（`gcp` `health_alert --profile gcp --dry-run` 返回 `issues={}`，可用盘 `34794 MiB`、可用内存 `6013 MiB`；`cgserver` `--profile edge --dry-run` 返回 `issues={}`，可用盘 `5235 MiB`、可用内存 `2087 MiB`）；公网 `https://cs.ave-mujica.top/major-homework` 及新产物 `index-DipyKGLa.js` / `index-DxX9SCi2.css` 均 HTTP `200`，匿名 `POST /api/major/homework/rank` 返回 `401`；真机 API、Chromium `820px` 截图（`shellClientW=700, shellScrollW=700` 零溢出，15 行排名列准确渲染 `1..7, 🌟, 8..10, 🌟, 11..12, 🌟`）及生产快照双坐标走势图（`dashed=3, solid=12`，图例零星号）全部通过，详见 [DELIVERY_CHECK.md](DELIVERY_CHECK.md)。
+
 ## 2026-11-24 TeamSpeak 边缘 HTTP 代理（`cgserver`）与 `plugins/ts` 单次异步接入上线
 
 - 按 `cjl` 拍板方案 B 解决跨洋 `/getts` / `/poke` 串行 `N+7` 次 Telnet 往返与阻塞问题：

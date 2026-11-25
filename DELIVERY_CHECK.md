@@ -1,5 +1,23 @@
 # 本地交付验收
 
+## 2026-11-25 Major 作业赛事级打🌟（无通行证排名打星 + 走势图虚线）三端上线验收
+
+- **`csbot`（`4fdef1ecd49854ce9cd2fae95689ce014dba39e7`，含 `3d37e2d` 与 `4fdef1e`）**：
+  - 新增 `plugins/major_hw/stars.py`（纯逻辑 `parse_stars_payload` / `serialize_stars_payload` / `assign_homework_ranks` 与异步 TTL 缓存读写，按 `config.major_name` 持久化至 `local_storage["major_hw_stars"]`，零数据库迁移）；
+  - 更新 `plugins/major_hw/chart.py`（`HomeworkSeries.starred`、`build_series(..., starred_uids=...)`、`STARRED_LINESTYLE=(0, (6, 3))`、线性与对数主折线打🌟渲染虚线且图例不加 🌟/★、`handlelength=2.6`）；
+  - 更新 `plugins/major_hw/__init__.py`（SUPERUSER `/作业打星` 列表/添加/取消命令、帮助文案、`/作业排名` 文字兜底、`/赛事作业结果` 标注、`/作业走势` 透传打🌟名单，并将 `_get_major_rank_screenshot` 视口宽度由 `760` 调至 `820` 消除 8px 横向溢出）；
+  - 更新 `plugins/cs_server/__init__.py`（`MajorHomeworkRankItem` 扩展 `rank`/`isStarred`，`MajorHomeworkHistoryItem` 与 `MajorHomeworkPersonalResponse` 扩展 `isStarred`，覆盖瑞士轮与淘汰赛）；新增 `checks/major_hw_stars_test.py`（24 项离线用例）。保留 `assets/edge/homepage.conf` 未触碰。
+- **`csbot-front`（源码 `182efb6242b9c82303132466aea9c2ccb9e6de42` -> `build-output` `9ceb9f94f043aae2df7daa77d696f5c7ac537cf1`）**：
+  - 扩展 `src/api/schemas.ts` 可选字段 `rank`/`isStarred`，新增 `src/utils/majorHomeworkRank.ts` 与 `checks/majorHomeworkRank.test.mjs`；更新 `src/views/MajorHomeworkRank.vue` 左侧新增「排名」列（普通 `1,2,3...`，打🌟显示 `🌟` 不占名次、原地混排）及 `src/views/MajorHomeworkPersonal.vue` 打星标签。保留 `.delivery-frontend.*`/`.frontend.*`/`.watchstage-*` 未触碰。
+- **本机与线上测试**：
+  - 本机 Windows：后端 `checks/major_hw_stars_test.py` 24/24、`checks/major_hw_chart_test.py` 54/54、`checks/major_virtual_users_test.py` 27/27、`checks/major_hw_singapore_test.py` 13/13（合计 118/118）；前端 `node --test checks/eloRank.test.mjs checks/majorHomeworkRank.test.mjs` 10/10、`npx tsc --noEmit` 与 `npm run build` 全绿；
+  - 线上 `gcp` Linux：`major_hw_stars_test.py` 24/24、`major_hw_chart_test.py` 54/54、`major_hw_singapore_test.py` 13/13、`scripts/check_ai_source.py` 2/2、`scripts/check_ai_boundaries.py` 4/4 全绿（`major_virtual_users_test.py` 26/27，仅依赖本地兄弟源码仓 `../csbot-front/public` 的 1 项环境用例跳过/失败，本机已 27/27 通过）。
+- **线上生产全链路实测（零 QQ 测试消息）**：
+  - `gcp` 写入 `local_storage["major_hw_stars"] = {"2026-singapore": ["2078553406", "3345039979", "3442127040"]}`，重启 `csbot.service`（`MainPID=264343`, `NRestarts=0`, `active`, OneBot `669299191` 已连接）；
+  - 既有已验证令牌实测 `/api/major/homework/rank`（15 人中 3 位打🌟 `rank=None, isStarred=True` 原地混排于第 8/12/15 行，其余 12 人连续编号 `1..12`）、`/history` 与 `/personal` 均准确；匿名请求返回 `401`；
+  - 真机 Chromium 820px 截图实测 `992,921` 字节（`1640×1800`，`shellClientW=700, shellScrollW=700` 零溢出，排名列渲染 `['1'..'7','🌟','8'..'10','🌟','11','12','🌟']`）；
+  - 生产快照走势图实测 `linear`（`436,089` 字节）与 `log`（`478,063` 字节）均 `dashed=3, solid=12` 且图例零 `🌟`/`★`；公网 `https://cs.ave-mujica.top/major-homework` 及新产物 `index-DipyKGLa.js`/`index-DxX9SCi2.css` HTTP `200`，双机健康体检均 `issues={}`，详见 [SERVER_SERVICES.md](SERVER_SERVICES.md)。
+
 ## 2026-11-24 `cgserver` ↔ `gcp` 拆分迁移与常驻 DSH Full Web 验收
 
 - **`csbot`（`6cad5eadc972c3b50a63959b37e8805338683959`，含 `1eb9d57` 与 `6cad5ea`）**：
